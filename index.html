@@ -890,6 +890,9 @@
   #overlay.prev-ov>*{pointer-events:auto;background:transparent;box-shadow:none;border:0;padding:0;max-width:none}
   .prev-bar{display:flex;gap:10px;align-items:center;background:rgba(255,250,240,.95);border-radius:14px;padding:8px 12px;box-shadow:0 6px 20px rgba(0,0,0,.2);margin-top:10px}
   #overlay.prev-ov{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+  #netOv.can .modal{pointer-events:auto}#netOv.can .modal button{cursor:pointer}#netOv.can .modal button.sent{outline:3px solid #7C5CE0}
+  #netOv.can .netWait{background:#7C5CE0;color:#fff}
+  #netOv.can .modal button{opacity:1}#netOv.can .modal button:disabled{opacity:.5}#netOv.can{background:rgba(30,60,110,.12)}
 </style>
 
 </head>
@@ -7322,7 +7325,7 @@ const PLACES = {
 };
 const placePrice = k => Math.round(PLACES[k].price * lifeScale());
 function showCityMap(back){
-  if (NET.open){ modal(`<div class="ev-ic">🌐</div><h2>Şehir online'da kapalı</h2><p>Online oyunda iki telefon aynı mekânı henüz birlikte gösteremiyor. Şehre <b>aynı cihazda birlikte</b> ya da tek kişilik oyunda gidebilirsiniz. Online'da evde vakit geçirip restoranda birlikte çalışabilirsiniz.</p><div class="btns"><button id="cmOk">Tamam</button></div>`); on("cmOk", () => back ? back() : closeOverlay()); return; }
+  if (NET.role === "guest") return;
   const used = !isTest() && save.home.daily && save.home.daily.out, ppl = householdChars().length;
   const pins = Object.entries(PLACES).map(([k, P]) => { const lock = P.minL > save.level;
     return `<button class="cpin ${lock ? "lock" : ""}" style="left:${P.x}%;top:${P.y}%" data-place="${k}" ${lock || used ? "disabled" : ""}><i>${P.ic}</i><b>${P.n}</b><small>${lock ? "Lv" + P.minL + "'de açılır" : P.price ? "$" + fmt(placePrice(k) * ppl) : "Giriş ücretsiz"}</small></button>`; }).join("");
@@ -7344,6 +7347,7 @@ let out = null;
 /* iki kişiyseniz sorar: birlikte mi gidiyorsunuz, yoksa biri gidip diğeri işe mi gidiyor / evde mi kalıyor? */
 function goOut(k, only, otherDo){
   const all = householdChars();
+  if (NET.open && only == null) only = -1;            // online: ikiniz birlikte gidersiniz, seçimleri ikiniz de yaparsınız
   if (all.length === 2 && only == null){
     const nm = i => escapeHtml(save.sims[i].name), P = PLACES[k];
     modal(`<div class="ev-ic">${P.ic}</div><h2>${P.n}: kim gidiyor?</h2><p>Birlikte gidebilir ya da ayrı takılabilirsiniz. Biri ${P.n.toLowerCase()}ya giderken diğeri işe gidip para kazanabilir ya da evde dinlenebilir.</p>
@@ -9875,6 +9879,11 @@ const NET = (() => {
     if (m.t === "in"){ N.gin.x = +m.x || 0; N.gin.z = +m.z || 0; }
     else if (m.t === "bye") lost("bye");
     else if (m.t === "b") guestButton(m.b);
+    else if (m.t === "click"){                 // misafir de seçebilir: şehir haritası, "kim gidiyor", mekân seçimleri, mini oyunlar
+      const ok = mode === "out" || overlay.querySelector(".citymap") || overlay.querySelector("#goBoth") || overlay.querySelector("[data-od]");
+      if (!ok || overlayOpen() === false || typeof m.sel !== "string" || m.sel.length > 80) return;
+      try { const el = overlay.querySelector(m.sel); if (el && !el.disabled && el.tagName === "BUTTON"){ el.click(); flash(`👆 ${N.guestName || "Misafir"} seçti`, "#7C5CE0"); } } catch(_){}
+    }
     else if (m.t === "hello"){
       const o = m.sim;
       if (o && typeof o === "object"){
@@ -9913,7 +9922,7 @@ const NET = (() => {
   const evq = [];
   N.ev = e => { if (N.role === "host" && N.open && evq.length < 200) evq.push(e); };
   function sceneSig(){
-    return [N.seq, mode, players.length, mode === "home" ? save.home.type + ":" + save.home.furniture.map(f => f.id + "@" + f.x + "," + f.z + "," + (f.rot || 0)).join(";") : ""].join("|");
+    return [N.seq, mode, players.length, mode === "out" && out ? "out:" + out.k + ":" + out.actors.length : mode === "home" ? save.home.type + ":" + save.home.furniture.map(f => f.id + "@" + f.x + "," + f.z + "," + (f.rot || 0)).join(";") : ""].join("|");
   }
   const hudPart = (k, v, s) => { if (last[k] !== v){ last[k] = v; s[k] = v; } };
   function snapshot(){
@@ -9924,6 +9933,11 @@ const NET = (() => {
       lastSig = sig; N.full = false; gen++;
       sentIds.clear(); sentLab.clear(); for (const k in last) delete last[k];
       s.sc = { mode, pc: players.length, save: clone(save), host: save.sims[0].name };
+      if (mode === "out" && out) s.sc.out = { k: out.k, ids: out.ids, date: out.dateNpc || null, n: out.actors.length };
+    }
+    if (mode === "out" && out){                // mekânda: herkesin duruşu, yeri ve sahne durumu (küçük paket)
+      s.A = out.actors.map(a => [a.pose, q2(a.sim.root.position.x), q2(a.sim.root.position.y), q2(a.sim.root.position.z), q3(a.sim.root.rotation.y), a.hype || 0]);
+      s.O = [out.playing ? 1 : 0, out.film || "", out.love ? 1 : 0, out.hearts ? 1 : 0, q2(out.camAz || 0), q2(out.polar || 1)];
     }
     s.P = players.map(p => [poseOf(p.sim), JSON.stringify(p.hand)]);
     s.C = customers.map(c => { const e = [c.id, poseOf(c.sim)]; if (!sentIds.has(c.id)){ sentIds.add(c.id); e.push(c.so, c.kind); } return e; });
@@ -10077,6 +10091,15 @@ const NET = (() => {
     G.cars.forEach(c => c.group.parent && c.group.parent.remove(c.group)); G.cars.clear();
     netLabels().innerHTML = ""; G.lab.clear();
     activity = null;
+    if (sc.mode === "out" && sc.out){
+      const ids = sc.out.ids || [0, 1], who = ids.map(i => save.sims[i]);
+      if (sc.out.date && typeof npcLook === "function") try { who.push(npcLook(sc.out.date)); } catch(_){}
+      buildOutScene(sc.out.k, who, ids);
+      createPlayers(0, false); focusCam();
+      G.ready = true; G.sceneMode = "out"; guestMode("out");
+      if (overlayOpen() && document.getElementById("gWaitBox")) closeOverlay();
+      return;
+    }
     if (sc.mode === "home"){
       buildHome();
       if (!save.home.slept) setSky("#f7b267", "#f9d7b5", "#f3ead6", 0xf2dcc3); else setSky("#6fb7ea", "#bfe3f5", "#f3ead6", 0xcfe8f3);
@@ -10120,6 +10143,8 @@ const NET = (() => {
     if (m.sc) buildGuestScene(m.sc);
     if (!G.ready) return;
     if (m.m !== mode) guestMode(m.m);
+    if (m.A && out && mode === "out") m.A.forEach((e, i) => { const a = out.actors[i]; if (!a) return; a.pose = e[0]; a.hype = e[5]; a.goal = null; a.tg = e; });
+    if (m.O && out){ out.playing = !!m.O[0]; if (m.O[1] && out.screen){ out.film = m.O[1]; out.screen.kind = m.O[1]; } out.love = !!m.O[2]; out.hearts = !!m.O[3]; out.camAz = m.O[4]; out.polar = m.O[5]; }
     (m.P || []).forEach((e, i) => { const p = players[i]; if (!p) return; tgt(p.sim, e[0]); if (p._hk !== e[1]){ p._hk = e[1]; try { setHand(p, JSON.parse(e[1])); } catch(_){} } });
     const seenC = new Set();
     (m.C || []).forEach(e => {
@@ -10164,7 +10189,8 @@ const NET = (() => {
     if (m.tut != null){ G.tut = m.tut; tutEl.innerHTML = m.tut; tutEl.style.display = m.tut ? "block" : "none"; tutEl.querySelectorAll("button").forEach(b => b.style.display = "none"); }
     if (m.ov != null){
       const no = netOv();
-      if (m.ov){ no.innerHTML = `<div class="netWait">👀 ${escapeHtml(N.hostName)} seçim yapıyor…</div>` + m.ov; no.style.display = "flex"; }
+      if (m.ov){ const can = mode === "out" || /citymap|goBoth|data-od=/.test(m.ov);
+        no.innerHTML = `<div class="netWait">${can ? "🗳️ İkiniz de seçebilirsiniz: dokun, seçimin " + escapeHtml(N.hostName) + "'e gider" : "👀 " + escapeHtml(N.hostName) + " seçim yapıyor…"}</div>` + m.ov; no.style.display = "flex"; no.classList.toggle("can", can); }
       else { no.style.display = "none"; no.innerHTML = ""; }
     }
     if (m.vig != null) vigEl.style.opacity = m.vig;
@@ -10237,6 +10263,12 @@ const NET = (() => {
       G.cars.forEach(c => { if (!c.t) return; const g = c.group; g.position.x += (c.t[0] - g.position.x) * k; g.position.z += (c.t[1] - g.position.z) * k;
         let d = c.t[2] - g.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); g.rotation.y += d * k; });
       if (pet && pet.t){ const g = pet.g; g.position.x += (pet.t[0] - g.position.x) * k; g.position.y = pet.t[1]; g.position.z += (pet.t[2] - g.position.z) * k; g.rotation.y = pet.t[3]; pet.tail.rotation.z = Math.sin(performance.now() / 300) * .4; }
+      if (mode === "out" && out){
+        updateOuting(dt);
+        out.actors.forEach(a => { const e = a.tg; if (!e) return; const r = a.sim.root, kk = Math.min(1, dt * 10);
+          r.position.x += (e[1] - r.position.x) * kk; r.position.z += (e[3] - r.position.z) * kk; if (a.pose !== "dance" && a.pose !== "jump" && a.pose !== "band") r.position.y = e[2];
+          let d = e[4] - r.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); r.rotation.y += d * kk; });
+      }
       updateParts(dt);
       const me = players[1] || players[0];
       if (camFollow && me && V && V.cam){
@@ -10249,6 +10281,15 @@ const NET = (() => {
     }
     if (draw) renderer.render(scene, camera);
   };
+  /* misafir: aynalanan pencerede (şehir, mekân seçimleri) butona dokununca ev sahibine gider */
+  document.addEventListener("click", e => {
+    if (N.role !== "guest" || !N.open) return;
+    const no = netOv(); if (!no || !no.classList.contains("can")) return;
+    const b = e.target.closest && e.target.closest("button"); if (!b || !no.contains(b)) return;
+    let sel = b.id ? "#" + b.id : null;
+    if (!sel) for (const a of b.attributes) if (a.name.startsWith("data-")){ sel = `[${a.name}="${a.value.replace(/"/g, "")}"]`; break; }
+    if (sel){ N.send({ t: "click", sel }); b.classList.add("sent"); SND.play("tick"); }
+  }, true);
   function showGuestWait(text){
     modal(`<div id="gWaitBox"><h2>🌐 Bağlandın!</h2><p>${text}</p><div class="btns"><button class="sec" id="gwLeave">🔌 Ayrıl</button></div></div>`);
     on("gwLeave", () => N.leave());
