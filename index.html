@@ -965,6 +965,8 @@
   body.compact .modal > .btns:last-child, body.compact .modal > div:last-child > .btns:last-child{bottom:-16px;margin:8px -16px -16px;padding:8px 16px 12px}
   #overlay.phone-ov .modal > .btns:last-child, #overlay.phone-ov .modal > div:last-child > .btns:last-child, .prev-ov .btns{position:static;background:none;margin:0;padding:0}
   #terBtn{position:fixed;z-index:9;padding:3px 9px;min-width:0;border-radius:999px;background:rgba(42,157,143,.92);color:#fff;font-size:12px;font-weight:800;line-height:1.3;border:1.5px solid #1d6f66;box-shadow:0 2px 0 #145149;display:none}
+  ol.steps{margin:6px 0 10px 18px;padding:0;line-height:1.55}ol.steps li{margin:3px 0}
+  .ver-tag{text-align:center;font-size:11px;opacity:.55;margin-top:6px}
 </style>
 
 </head>
@@ -3770,7 +3772,7 @@ function homeScores(){
 const camera = new THREE.PerspectiveCamera(32, 1, .1, 240);
 const cam = { az: .62, polar: .92, r: 17, target: new THREE.Vector3(0, .6, .7), shake: 0 };
 let baseR = 17, camFollow = false;
-const camMaxR = () => Math.max(50, baseR * 1.45);   // büyük dükkânda daha uzağa çekilebilsin
+const camMaxR = () => Math.max(50, baseR * 1.45, V && V.cam ? camBaseR0(V.cam.r) * 1.3 : 0);   // büyük dükkânda daha uzağa çekilebilsin
 const camZR = () => V && V.bounds ? Math.max(3, (V.bounds.z1 - V.bounds.z0) / 2 - 2) : 3;
 const camBaseR0 = r => camera.aspect < 1 ? r / Math.max(.45, camera.aspect) * .62 + r * .35 : r;
 /* telefonda (küçük ekran) dükkân ne kadar büyük olursa olsun kamera yakın durur ve oyuncuyu izler; parmakla yine uzaklaştırılabilir */
@@ -6161,8 +6163,9 @@ function showMenu(){
       <button id="bShop">💎 ${prefs.diamonds}</button>
       <button id="bHow">❓</button>
       <button id="bSet">⚙️</button>
-    </div>`);
+    </div><div class="ver-tag">sürüm v${NET_BUILD}</div>`);
   overlay.firstElementChild.classList.add("menu");
+  if (isIOS() && !isStandalone() && !window.Capacitor && !prefs.iosHintSeen && !NET.open) setTimeout(() => { if (mode === "menu" && overlay.querySelector(".menu")) iosFullHint(); }, 900);
   on("bHow", () => showHowTo([{ label: "← Menüye dön", fn: showMenu }]));
   on("bSet", () => showSettings());
   on("bWheel", () => showWheel(showMenu));
@@ -6220,6 +6223,18 @@ function showBackup(back){
     } catch(e){ if (msg) msg.textContent = "⚠️ Bu geçerli bir yedek değil."; }
   });
 }
+/* iPhone/iPad Safari tam ekranı desteklemez (Apple kısıtı): tam ekran için Ana Ekrana Ekle gerekir */
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isStandalone = () => !!(navigator.standalone || (window.matchMedia && matchMedia("(display-mode: standalone)").matches));
+function iosFullHint(back = showMenu){
+  prefs.iosHintSeen = 1; writePrefs();
+  modal(`<h2>📲 iPhone'da tam ekran</h2>
+    <p>Apple, Safari'de oyunların tam ekran açılmasına izin vermiyor. Tam ekran için oyunu bir kez <b>Ana Ekrana ekle</b>; sonra uygulama gibi, çubuksuz açılır.</p>
+    <ol class="steps"><li>Safari'nin altındaki <b>Paylaş</b> düğmesine dokun <b>(□↑)</b></li><li>Aşağı kaydır, <b>Ana Ekrana Ekle</b>'yi seç</li><li><b>Ekle</b>'ye dokun, oyunu ana ekrandaki <b>🍔 Burger Life</b> simgesinden aç</li></ol>
+    <div class="tipbox">⚠️ iPhone, ana ekrandaki oyunun kayıtlarını Safari'den <b>ayrı</b> tutar. Önce aşağıdan <b>💾 Kaydımı taşı</b> ile yedek kodunu kopyala; ana ekrandaki oyunda ⚙️ Ayarlar › Kayıt yedeği › yapıştır › Geri yükle. Böylece kaldığın yerden devam edersin.</div>
+    <div class="btns"><button class="sec" id="ihBack">← Tamam</button><button id="ihBak">💾 Kaydımı taşı</button></div>`);
+  on("ihBack", () => back()); on("ihBak", () => showBackup(() => iosFullHint(back)));
+}
 function showSettings(back = showMenu){
   const full = !window.Capacitor && (document.fullscreenEnabled || document.webkitFullscreenEnabled);
   modal(`<h2>⚙️ Ayarlar</h2>
@@ -6227,7 +6242,8 @@ function showSettings(back = showMenu){
       <div class="set-item"><div><b>Ses ve müzik</b><small>Müzik, mutfak ve müşteri sesleri</small></div><button class="sec" id="sMute">${save.muted ? "🔇 Kapalı" : "🔊 Açık"}</button></div>
       <div class="set-item"><div><b>İpuçları</b><small>${HINT_MODES[save.hintMode || "auto"]}</small></div><button class="sec" id="sHint">Değiştir</button></div>
       <div class="set-item"><div><b>Kontroller</b><small>Dokunmatik, klavye, PS/Xbox kolu ve Android TV kumandası</small></div><button class="sec" id="sKeys">Göster</button></div>
-      ${full ? `<div class="set-item"><div><b>Tam ekran</b><small>Tarayıcı çubuklarını gizle</small></div><button class="sec" id="sFull">Aç</button></div>` : ""}
+      ${full && !isIOS() ? `<div class="set-item"><div><b>Tam ekran</b><small>Tarayıcı çubuklarını gizle</small></div><button class="sec" id="sFull">Aç</button></div>` : ""}
+      ${isIOS() && !isStandalone() && !window.Capacitor ? `<div class="set-item"><div><b>Tam ekran (iPhone)</b><small>Ana Ekrana ekleyince çubuksuz açılır</small></div><button class="sec" id="sIos">Nasıl?</button></div>` : ""}
       <div class="set-item"><div><b>💾 Kayıt yedeği</b><small>Tüm kayıtlarını dosyaya indir ya da başka cihaza/tarayıcıya taşı</small></div><button class="sec" id="sBak">Aç</button></div>
       <div class="set-item"><div><b>🧪 Test modu</b><small>Geliştirici girişi: şifreyle açılır, hikâye kaydına dokunmaz</small></div><button class="sec" id="sTest">Giriş</button></div>
       <div class="set-item"><div><b>Seviyeleri incele</b><small>Kaydını değiştirmeden her mekânı ve evi gez</small></div><button class="sec" id="sPrev">Aç</button></div>
@@ -6237,7 +6253,7 @@ function showSettings(back = showMenu){
   on("sMute", () => { toggleMute(); showSettings(back); });
   on("sHint", () => { const order = ["auto", "on", "off"]; save.hintMode = order[(order.indexOf(save.hintMode || "auto") + 1) % 3]; writeSave(); showSettings(back); });
   on("sKeys", () => { modal(`<h2>🎮 Kontroller</h2>${controlsHTML()}<div class="btns"><button class="sec" id="kBack">← Ayarlar</button></div>`); on("kBack", () => showSettings(back)); });
-  on("sFull", goFullscreen);
+  on("sFull", goFullscreen); on("sIos", () => iosFullHint(() => showSettings(back)));
   on("sBak", () => showBackup(() => showSettings(back)));
   on("sPrev", showPreviewMenu);
   on("sTest", () => testLogin(() => showSettings(back)));
@@ -6907,7 +6923,7 @@ function pollPads(dt){
     }
     if (mode === "game" || mode === "home"){
       cam.az -= ax(2) * dt * 2.2;
-      cam.polar = clamp(cam.polar + ax(3) * dt * 1.2, .55, 1.25);
+      cam.polar = clamp(cam.polar + ax(3) * dt * 1.2, .5, 1.42);
       if (pr(6)) cam.r = Math.min(camMaxR(), cam.r + dt * 10);
       if (pr(7)) cam.r = Math.max(7, cam.r - dt * 10);
     }
@@ -11682,8 +11698,13 @@ function pEnd(e){ allP.delete(e.pointerId); if (allP.size < 2) pz = null; }
     el.style.left = (vx - tr.left - h) + "px"; el.style.top = (vy - tr.top - h) + "px"; el.style.bottom = "auto";
   }
   joyCancel = () => { joy.id = null; joy.x = joy.y = 0; start = null; joyStartRef = null; knob.style.transform = ""; el.classList.remove("on"); el.style.left = el.style.top = el.style.bottom = ""; };
+  /* üstteki göstergelerin (seviye, gün, para, oyuncu kartı, görev kartı…) üstüne dokununca analog açılmasın; altında tuş varsa ona bas */
+  const HUD_SEL = ".topbar, #simPanel, #qCard, #terBtn, #ecoBar, #orderRail, .order-rail, #rush, #helpBtn, #muteBtn";
+  const hudUnder = (x, y) => { for (const el of document.elementsFromPoint(x, y)){ if (el === zone || el.id === "touch" || el.tagName === "CANVAS" || el === document.body || el === document.documentElement) continue; const h = el.closest(HUD_SEL); if (h && getComputedStyle(h).display !== "none" && getComputedStyle(h).visibility !== "hidden") return el; } return null; };
   zone.addEventListener("pointerdown", e => {
     e.preventDefault();
+    const hu = allP.size === 0 && hudUnder(e.clientX, e.clientY);
+    if (hu){ const b = hu.closest("button, [data-qgo], [data-career], #qcH, [onclick]"); if (b) b.click(); return; }
     try { zone.setPointerCapture(e.pointerId); } catch(_){}
     if (pAdd(e, "zone")) return;            // iki parmak: yakınlaştırma
     if (joy.id !== null) return;
@@ -11721,7 +11742,7 @@ cv.addEventListener("pointermove", e => {
   if (mode === "cas"){ casRot += dx * .012; return; }
   if (pMove(e)) return;
   if (ptrs.size === 1 && (officeEdPtr("move", e.clientX, e.clientY) || editPtr("move", e.clientX, e.clientY))) return;
-  if (ptrs.size === 1 && !pz){ cam.az -= dx * .006; cam.polar = clamp(cam.polar - dy * .004, .55, 1.25); }
+  if (ptrs.size === 1 && !pz){ cam.az -= dx * .006; cam.polar = clamp(cam.polar - dy * .004, .5, 1.42); }
 });
 const endPtr = e => {
   pEnd(e);
@@ -12508,7 +12529,7 @@ const NET = (() => {
         if (edge(3)) N.btn("coffee");
         if (edge(2) || edge(4) || edge(5)) N.btn("give");
         if (edge(9) || edge(8)) showGuestMenu();
-        cam.az -= ax(2) * dt * 2.2; cam.polar = clamp(cam.polar + ax(3) * dt * 1.2, .55, 1.25);
+        cam.az -= ax(2) * dt * 2.2; cam.polar = clamp(cam.polar + ax(3) * dt * 1.2, .5, 1.42);
         if (pr(6)) cam.r = Math.min(camMaxR(), cam.r + dt * 10);
         if (pr(7)) cam.r = Math.max(7, cam.r - dt * 10);
         G.pad = gp.buttons.map(b => b.pressed);
@@ -12605,7 +12626,7 @@ const NET = (() => {
 })();
 
 /* ---------- Online menüsü ---------- */
-const NET_BUILD = 36;   // online sürüm uyumu kontrolü
+const NET_BUILD = 40;   // online sürüm uyumu kontrolü
 /* oda kodu: Türkçe klavyede gelen İ/ı/Ö/Ü/Ş/Ç/Ğ harfleri düzeltilir, boşluklar atılır */
 const normCode = v => String(v || "").replace(/[İıi]/g, "I").replace(/[Öö0]/g, "O").replace(/[Üü]/g, "U").replace(/[Şş]/g, "S").replace(/[Çç]/g, "C").replace(/[Ğğ]/g, "G").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);   // online sürüm uyumu kontrolü
 function showNetMenu(){
