@@ -964,8 +964,7 @@
   .modal > .btns:last-child, .modal > div:last-child > .btns:last-child{position:sticky;bottom:-22px;margin:10px -24px -22px;padding:10px 24px 14px;background:linear-gradient(180deg,rgba(255,248,236,0),var(--paper,#fff8ec) 28%);z-index:3}
   body.compact .modal > .btns:last-child, body.compact .modal > div:last-child > .btns:last-child{bottom:-16px;margin:8px -16px -16px;padding:8px 16px 12px}
   #overlay.phone-ov .modal > .btns:last-child, #overlay.phone-ov .modal > div:last-child > .btns:last-child, .prev-ov .btns{position:static;background:none;margin:0;padding:0}
-  #terBtn{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));z-index:9;padding:8px 14px;border-radius:999px;background:#2a9d8f;color:#fff;font-weight:800;border:2px solid #1d6f66;box-shadow:0 3px 0 #145149;display:none}
-  body.touchdev #terBtn{bottom:calc(150px + env(safe-area-inset-bottom))}
+  #terBtn{position:fixed;z-index:9;padding:3px 9px;min-width:0;border-radius:999px;background:rgba(42,157,143,.92);color:#fff;font-size:12px;font-weight:800;line-height:1.3;border:1.5px solid #1d6f66;box-shadow:0 2px 0 #145149;display:none}
 </style>
 
 </head>
@@ -2920,11 +2919,16 @@ function terraceTick(){
   if (pf !== lastPf){ lastPf = pf; viewManual = null; }
   viewFl = viewManual != null ? viewManual : pf;
   V.upG.visible = viewFl === 1;
-  const vis = o => { const up = onUpper(o.group.position); o.group.visible = o.hiddenWC ? false : (viewFl === 1 || !up || inStair(o.group.position)); };
+  const showAt = r => viewFl === 1 || !onUpper(r.position) || inStair(r.position);
+  const vis = o => { o.group.visible = showAt(o.group.position ? o.group : o.group); };
   customers.forEach(c => { if (c.wcT == null) vis(c); }); staff.forEach(w => { if (w.state !== "away") vis(w); }); players.forEach(vis);
+  if (NET.role === "guest" && NET.guestCust) NET.guestCust().forEach(c => { if (c.sim && c.sim.root) c.sim.root.visible = showAt(c.sim.root); });   // misafir: kendi görünümü
   cam.target.y += ((viewFl ? S.h + .6 : .6) - cam.target.y) * .12;
-  let b = btn; if (!b){ b = document.createElement("button"); b.id = "terBtn"; b.onclick = () => { viewManual = viewFl ? 0 : 1; SND.play("step", .2); }; document.body.appendChild(b); }
-  b.style.display = "block"; const t = viewFl ? "🔽 Salonu göster" : "🔼 Terası göster"; if (b.textContent !== t) b.textContent = t;
+  let b = btn; if (!b){ b = document.createElement("button"); b.id = "terBtn"; b.title = "Kat görünümünü değiştir (sadece senin ekranın)"; b.onclick = () => { viewManual = viewFl ? 0 : 1; SND.play("step", .2); }; document.body.appendChild(b); }
+  b.style.display = "block"; const t = viewFl ? "🔽 Salon" : "🔼 Teras"; if (b.textContent !== t) b.textContent = t;
+  // oyuncu kartlarının hemen altında, sol üstte (kartlarla çakışmadan)
+  const sp = document.getElementById("simPanel"), r = sp && sp.style.display !== "none" && sp.getBoundingClientRect();
+  const top = r && r.height ? r.bottom + 6 : 70, left = r && r.height ? r.left : 8; b.style.top = Math.round(top) + "px"; b.style.left = Math.round(left) + "px";
 }
 
 /* =====================================================================
@@ -3768,7 +3772,9 @@ const cam = { az: .62, polar: .92, r: 17, target: new THREE.Vector3(0, .6, .7), 
 let baseR = 17, camFollow = false;
 const camMaxR = () => Math.max(50, baseR * 1.45);   // büyük dükkânda daha uzağa çekilebilsin
 const camZR = () => V && V.bounds ? Math.max(3, (V.bounds.z1 - V.bounds.z0) / 2 - 2) : 3;
-const camBaseR = r => camera.aspect < 1 ? r / Math.max(.45, camera.aspect) * .62 + r * .35 : r;
+const camBaseR0 = r => camera.aspect < 1 ? r / Math.max(.45, camera.aspect) * .62 + r * .35 : r;
+/* telefonda (küçük ekran) dükkân ne kadar büyük olursa olsun kamera yakın durur ve oyuncuyu izler; parmakla yine uzaklaştırılabilir */
+const camBaseR = r => { const b = camBaseR0(r); return camFollow && V && V.kind === "shop" ? Math.min(b, camera.aspect < 1 ? 36 : 30) : b; };
 function focusCam(){
   if (!V) return;
   cam.target.set(V.cam.x, V.cam.y, V.cam.z);
@@ -3791,7 +3797,7 @@ function resize(){
   // küçük ekran düzeni: telefon yatay/dikey
   const compact = Math.min(w, h) < 560 || w < 700, bc = document.body.classList;
   bc.toggle("compact", compact); bc.toggle("land", compact && w > h); bc.toggle("port", compact && w <= h);
-  camFollow = compact && w <= h;
+  camFollow = compact;
   bc.toggle("tiny", Math.min(w, h) < 380); bc.toggle("touchdev", isTouch);
   renderer.setSize(w, h);
   camera.aspect = w / h;
@@ -6017,7 +6023,8 @@ function tick(dt, draw){
     updateTension(dt);
     if (camFollow && (mode === "game" || mode === "home") && players.length && V && V.cam){   // dikey telefonda kamera oyuncuyu izler
       let x = 0, z = 0; players.forEach(p => { x += p.group.position.x; z += p.group.position.z; }); x /= players.length; z /= players.length;
-      const tx = V.cam.x + clamp(x - V.cam.x, -4.5, 4.5) * .8, tz = V.cam.z + clamp(z - V.cam.z, -camZR(), camZR()) * .45, k = Math.min(1, dt * 3);
+      const big = V.kind === "shop" && V.bounds, xr = big ? Math.max(4.5, (V.bounds.x1 - V.bounds.x0) / 2) : 4.5, fz = big ? .85 : .45;
+      const tx = V.cam.x + clamp(x - V.cam.x, -xr, xr) * .85, tz = V.cam.z + clamp(z - V.cam.z, -camZR() - 2, camZR() + 2) * fz, k = Math.min(1, dt * 3);
       cam.target.x = lerp(cam.target.x, tx, k); cam.target.z = lerp(cam.target.z, tz, k);
     }
     applyCamera();
@@ -11637,6 +11644,24 @@ function showTestMenu(){
    DOKUNMATİK JOYSTICK + KAMERA (sürükle / tekerlek / iki parmak) + DOKUNARAK YERLEŞTİRME
    ===================================================================== */
 const joy = { x: 0, y: 0, id: null };
+/* iki parmakla yakınlaştırma ekranın HER yerinde çalışır (sol joystick yarısı dahil):
+   - iki parmak da sağ (kamera) yarısındaysa → yakınlaştır
+   - joystick'e basılıp henüz yürünmeden ikinci parmak gelirse → joystick iptal, yakınlaştır
+   - yürürken (joystick oynatılmış) sağa dokunmak kamerayı döndürür, yakınlaştırmaz; tuşlar hiç etkilenmez */
+const allP = new Map(); let pz = null, joyStartRef = null, joyCancel = null;
+const pDist = () => { const [a, b] = [...allP.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; };
+function pAdd(e, src){
+  allP.set(e.pointerId, { x: e.clientX, y: e.clientY, src });
+  if (allP.size === 2 && !pz){
+    const arr = [...allP.values()], cvN = arr.filter(a => a.src === "cv").length, js = joyStartRef;
+    const joyFresh = js && !js.moved && performance.now() - js.t < 450;
+    if (cvN === 2 || joyFresh || (cvN === 1 && arr.some(a => a.src === "zone") && !(js && js.moved))){ pz = { d0: pDist(), r0: cam.r }; joyCancel && joyCancel(); }
+  }
+  return !!pz;
+}
+function pMove(e){ const p = allP.get(e.pointerId); if (!p) return false; p.x = e.clientX; p.y = e.clientY;
+  if (pz && allP.size >= 2 && (mode === "game" || mode === "home" || mode === "preview")){ cam.r = clamp(pz.r0 * pz.d0 / pDist(), 7, camMaxR()); return true; } return !!pz; }
+function pEnd(e){ allP.delete(e.pointerId); if (allP.size < 2) pz = null; }
 (() => {
   /* Sol yarı = joystick alanı: parmak nereye basarsa analog orada açılır */
   const zone = document.getElementById("joyZone"), el = document.getElementById("joy"), knob = document.getElementById("knob"), R = 50;
@@ -11656,19 +11681,23 @@ const joy = { x: 0, y: 0, id: null };
     const vx = clamp(cx, tr.left + h, tr.left + tr.width / 2 - h), vy = clamp(cy, tr.top + h, tr.bottom - h);
     el.style.left = (vx - tr.left - h) + "px"; el.style.top = (vy - tr.top - h) + "px"; el.style.bottom = "auto";
   }
+  joyCancel = () => { joy.id = null; joy.x = joy.y = 0; start = null; joyStartRef = null; knob.style.transform = ""; el.classList.remove("on"); el.style.left = el.style.top = el.style.bottom = ""; };
   zone.addEventListener("pointerdown", e => {
-    if (joy.id !== null) return;
     e.preventDefault();
+    try { zone.setPointerCapture(e.pointerId); } catch(_){}
+    if (pAdd(e, "zone")) return;            // iki parmak: yakınlaştırma
+    if (joy.id !== null) return;
     joy.id = e.pointerId; try { zone.setPointerCapture(e.pointerId); } catch(_){}
     cx = e.clientX; cy = e.clientY; placeJoy(); el.classList.add("on");
-    start = { x: e.clientX, y: e.clientY, t: performance.now(), moved: false };
+    start = { x: e.clientX, y: e.clientY, t: performance.now(), moved: false }; joyStartRef = start;
     move(e);
   });
-  zone.addEventListener("pointermove", e => { if (e.pointerId === joy.id) move(e); });
+  zone.addEventListener("pointermove", e => { if (pMove(e)) return; if (e.pointerId === joy.id) move(e); });
   const end = e => {
+    pEnd(e);
     if (e.pointerId !== joy.id) return;
     if (start && !start.moved && performance.now() - start.t < 350) tapFloor(e.clientX, e.clientY);   // düzenleme modunda dokunup yerleştirme
-    joy.id = null; joy.x = joy.y = 0; start = null;
+    joy.id = null; joy.x = joy.y = 0; start = null; joyStartRef = null;
     knob.style.transform = ""; el.classList.remove("on");
     el.style.left = el.style.top = el.style.bottom = "";
   };
@@ -11680,7 +11709,8 @@ const joy = { x: 0, y: 0, id: null };
 const ptrs = new Map(); let pinch0 = 0, r0 = 0, tapStart = null;
 const cv = renderer.domElement;
 cv.addEventListener("pointerdown", e => {
-  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); cv.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); try { cv.setPointerCapture(e.pointerId); } catch(_){}
+  if (pAdd(e, "cv")){ tapStart = null; return; }
   if (ptrs.size === 1 && (officeEdPtr("down", e.clientX, e.clientY) || editPtr("down", e.clientX, e.clientY))){ tapStart = null; return; }
   tapStart = ptrs.size === 1 ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
   if (ptrs.size === 2){ const [a, b] = [...ptrs.values()]; pinch0 = Math.hypot(a.x - b.x, a.y - b.y); r0 = cam.r; }
@@ -11689,17 +11719,18 @@ cv.addEventListener("pointermove", e => {
   const pr = ptrs.get(e.pointerId); if (!pr) return;
   const dx = e.clientX - pr.x, dy = e.clientY - pr.y; pr.x = e.clientX; pr.y = e.clientY;
   if (mode === "cas"){ casRot += dx * .012; return; }
+  if (pMove(e)) return;
   if (ptrs.size === 1 && (officeEdPtr("move", e.clientX, e.clientY) || editPtr("move", e.clientX, e.clientY))) return;
-  if (ptrs.size === 1){ cam.az -= dx * .006; cam.polar = clamp(cam.polar - dy * .004, .55, 1.25); }
-  else if (ptrs.size === 2){ const [a, b] = [...ptrs.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y); if (pinch0) cam.r = clamp(r0 * pinch0 / d, 7, camMaxR()); }
+  if (ptrs.size === 1 && !pz){ cam.az -= dx * .006; cam.polar = clamp(cam.polar - dy * .004, .55, 1.25); }
 });
 const endPtr = e => {
+  pEnd(e);
   if (officeEdPtr("up", e.clientX, e.clientY) || editPtr("up", e.clientX, e.clientY)){ tapStart = null; ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch0 = 0; return; }
   if (tapStart && ptrs.size === 1 && Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y) < 8 && performance.now() - tapStart.t < 350) tapFloor(e.clientX, e.clientY);
   tapStart = null;
   ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch0 = 0;
 };
-cv.addEventListener("pointerup", endPtr); cv.addEventListener("pointercancel", e => { tapStart = null; ptrs.delete(e.pointerId); });
+cv.addEventListener("pointerup", endPtr); cv.addEventListener("pointercancel", e => { tapStart = null; ptrs.delete(e.pointerId); pEnd(e); });
 cv.addEventListener("wheel", e => { e.preventDefault(); if (mode === "game" || mode === "home") cam.r = clamp(cam.r * (1 + e.deltaY * .001), 7, camMaxR()); }, { passive: false });
 
 /* =====================================================================
@@ -11882,6 +11913,7 @@ const NET = (() => {
     full: true, gin: { x: 0, z: 0 }, guestName: "", hostName: "", cb: {}, aud: null, audS: "menu", rxBytes: 0, txBytes: 0 };
   const q3 = v => Math.round(v * 1000) / 1000, q2 = v => Math.round(v * 100) / 100;
   N.ctrl = p => N.role === "host" && N.open && p.idx === 1;
+  N.guestCust = () => [...G.cust.values()];
   const rid = () => Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 6);
   N.rcode = () => { let s = ""; for (let k = 0; k < 4; k++) s += CODE_A[Math.random() * CODE_A.length | 0]; return s; };
 
@@ -12075,6 +12107,7 @@ const NET = (() => {
       } catch(_){}
     }
     else if (m.t === "hello"){
+      try { svT = 8; } catch(e){}          // misafir yeni bağlandı: önce sahne gitsin, kayıt kopyası sonra
       const o = m.sim;
       if (o && typeof o === "object"){
         const role = (save.sims[1] && save.sims[1].role) || "manager";
@@ -12194,8 +12227,19 @@ const NET = (() => {
     return s;
   }
   N.snap = () => snapshot();
+  /* ortak kaydın kopyası misafire de gider: misafir sonra aynı odayı kendisi kurup kaldığınız yerden başlatabilir */
+  let svT = 4, lastSv = "", svSeq = 0;
+  function sendSaveCopy(){
+    if (previewBackup || !save || save.test || !curSlot || !save.sims || !save.sims[1]) return;
+    if (N.dc && N.dc.bufferedAmount > 150000) return;     // bağlantı meşgulken bekle
+    const js = JSON.stringify(save); if (js === lastSv) return; lastSv = js;
+    const id = ++svSeq, CH = 48000, n = Math.ceil(js.length / CH);
+    for (let i = 0; i < n; i++) N.send({ t: "svc", id, i, n, d: js.slice(i * CH, (i + 1) * CH) });
+  }
+  N.sendSaveCopy = () => { lastSv = ""; try { sendSaveCopy(); } catch(e){} };
   N.hostTick = dt => {
     if (!(N.role === "host" && N.open)) return;
+    svT -= dt; if (svT <= 0){ svT = 20; try { sendSaveCopy(); } catch(e){} }
     sendT -= dt;
     if (sendT > 0) return;
     sendT = 1 / 12;
@@ -12356,8 +12400,20 @@ const NET = (() => {
     }
     applyPose(s, c);
   }
+  const svBuf = {};
+  function storeRoomCopy(js){
+    try { const s = JSON.parse(js); if (!s || !s.sims || !s.sims[1] || s.test) return;
+      const hostSim = s.sims[0]; s.sims = [s.sims[1], s.sims[0]].concat(s.sims.slice(2));      // misafirin telefonunda kendi karakteri 1. oyuncu
+      ["life", "life2"].forEach(k => { if (s[k] && s[k].owner != null) s[k].owner = 1 - s[k].owner; });
+      const id = netSlug(hostSim.name); s.slot = { id, kind: "net" };
+      localStorage.setItem(SLOT_PREFIX + id, JSON.stringify(s));
+      const ix = slotIndex().filter(x => x.id !== id); ix.unshift({ id, kind: "net", names: [s.sims[0].name, s.sims[1].name], level: s.level, day: s.day, money: s.money, shifts: s.shifts, t: Date.now() }); writeIndex(ix);
+      N.copyAt = Date.now();
+    } catch(e){ console.warn("oda kopyası", e); }
+  }
   function guestRx(m){
     if (m.t === "bye"){ guestEnd("📴 Ev sahibi odayı kapattı"); return; }
+    if (m.t === "svc"){ const b = svBuf[m.id] || (svBuf[m.id] = { n: m.n, p: [] }); b.p[m.i] = m.d; if (b.p.filter(x => x != null).length === b.n){ storeRoomCopy(b.p.join("")); delete svBuf[m.id]; } return; }
     if (m.t !== "s") return;
     if (m.cas){ if (!document.getElementById("gWaitBox") && !overlayOpen()) showGuestWait(`${N.hostName || "Ev sahibi"} karakter ekranında…`); return; }
     if (m.sc) buildGuestScene(m.sc);
@@ -12494,8 +12550,9 @@ const NET = (() => {
       const me = players[1] || players[0];
       if (camFollow && me && V && V.cam){
         const x = me.group.position.x, z = me.group.position.z, kk = Math.min(1, dt * 3);
-        cam.target.x = lerp(cam.target.x, V.cam.x + clamp(x - V.cam.x, -4.5, 4.5) * .8, kk);
-        cam.target.z = lerp(cam.target.z, V.cam.z + clamp(z - V.cam.z, -camZR(), camZR()) * .45, kk);
+        const big = V.kind === "shop" && V.bounds, xr = big ? Math.max(4.5, (V.bounds.x1 - V.bounds.x0) / 2) : 4.5;
+        cam.target.x = lerp(cam.target.x, V.cam.x + clamp(x - V.cam.x, -xr, xr) * .85, kk);
+        cam.target.z = lerp(cam.target.z, V.cam.z + clamp(z - V.cam.z, -camZR() - 2, camZR() + 2) * (big ? .85 : .45), kk);
       }
       try { terraceTick(); } catch(e){}
       applyCamera(); updateFacade(); updateOccluders(dt);
@@ -12551,15 +12608,16 @@ function showNetMenu(){
   const me = netMe();
   if (!me){ editNetProfile(); return; }          // ilk kez: önce karakterini tasarla ve adını yaz
   modal(`<h2>🌐 Online oyna</h2>
-    <p>İki telefon internet üzerinden bağlanır. Biriniz <b>oda kurar</b>, diğeri ekranda çıkan <b>4 harfli kodu</b> girer. Oyunu odayı kuran yönetir; ilerleme onun telefonuna kaydedilir.</p>
+    <p>İki telefon internet üzerinden bağlanır. Biriniz <b>oda kurar</b>, diğeri ekranda çıkan <b>4 harfli kodu</b> girer. Oyunu odayı kuran yönetir; ilerleme <b>ikinizin telefonuna da</b> kaydedilir, sonra hanginiz isterse kayıtlı odayı kurup kaldığınız yerden başlatabilir.</p>
     <div class="netBox"><button id="nHost">🏠 Oda kur</button><span class="chip">Sen oyunu yönetirsin</span></div>
-    ${(() => { const l = slotIndex().filter(x => x.kind === "net"); return l.length ? `<div class="slot-list">${l.map(x => `<div class="slot"><div class="slot-av">🌐</div><div class="slot-main"><b>${escapeHtml(x.names[1] || "?")} ile</b><small>${slotLine(x)}</small></div></div>`).join("")}</div><p style="font-size:12px">Oda kurduğunda aynı arkadaşın bağlanırsa ortak kaydınız otomatik açılır ve kaldığınız yerden devam edersiniz. Kod her seferinde yeni üretilir.</p>` : ""; })()}
+    ${(() => { const l = slotIndex().filter(x => x.kind === "net"); return l.length ? `<div class="slot-list">${l.map(x => `<div class="slot"><div class="slot-av">🌐</div><div class="slot-main"><b>${escapeHtml(x.names[1] || "?")} ile</b><small>${slotLine(x)}</small></div><button data-nhost="${x.id}">🏠 Odayı kur</button></div>`).join("")}</div><p style="font-size:12px">Oda kurduğunda aynı arkadaşın bağlanırsa ortak kaydınız otomatik açılır ve kaldığınız yerden devam edersiniz. Kod her seferinde yeni üretilir.</p>` : ""; })()}
     <div class="netBox"><input id="nCode" type="text" maxlength="4" placeholder="KOD" autocomplete="off" autocapitalize="characters" spellcheck="false"><button id="nJoin">🔗 Katıl</button></div>
     <div class="slot"><div class="slot-av">${portraitURL(me) ? `<img src="${portraitURL(me)}" alt="" style="width:44px;height:44px;border-radius:50%">` : "🙂"}</div><div class="slot-main"><b>${escapeHtml(me.name)}</b><small>Online karakterin</small></div><button class="sec" id="nEdit">🎨 Düzenle</button></div>
     <div class="btns"><button class="sec" id="nBack">← Geri</button></div>`);
   on("nBack", showMenu);
   on("nEdit", () => editNetProfile());
   on("nHost", hostRoom);
+  overlay.querySelectorAll("[data-nhost]").forEach(b => b.onclick = () => { const x = slotIndex().find(s => s.id === b.dataset.nhost); flash(`🏠 Oda kuruluyor: ${x && x.names[1] ? x.names[1] + " katılınca kayıtlı oyununuz açılır" : "arkadaşın katılınca kayıt açılır"}`, "#43c06a"); hostRoom(); });
   const inp = document.getElementById("nCode");
   inp.addEventListener("input", () => { inp.value = inp.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4); });
   inp.addEventListener("keydown", e => { if (e.key === "Enter") joinRoom(inp.value); });
