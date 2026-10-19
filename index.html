@@ -929,7 +929,7 @@
   .rl-ptr{position:absolute;top:-10px;z-index:2;color:#f3c34a;font-size:22px;text-shadow:0 2px 2px #000}
   .rl-res{font-weight:700}.rl-n{display:inline-block;min-width:34px;padding:3px 8px;border-radius:8px;color:#fff;font-weight:900;text-align:center}
   .rl-picks button small{opacity:.7}
-  #qCard{position:fixed;right:10px;top:66px;width:min(290px,46vw);max-height:56vh;overflow:auto;z-index:40;background:rgba(255,250,240,.94);border:2px solid #C99A5E;border-radius:14px;box-shadow:0 6px 18px rgba(40,20,0,.25);font-size:12.5px;display:none}
+  #qCard{position:fixed;right:10px;top:66px;width:min(290px,46vw);max-height:56vh;overflow:auto;z-index:29;background:rgba(255,250,240,.94);border:2px solid #C99A5E;border-radius:14px;box-shadow:0 6px 18px rgba(40,20,0,.25);font-size:12.5px;display:none}
   #qCard .qc-h{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:7px 10px;background:#7a2e22;color:#fff;border-radius:11px 11px 0 0;cursor:pointer;position:sticky;top:0}
   #qCard .qc-b{padding:6px 8px}#qCard .qr{display:flex;align-items:center;gap:6px;padding:4px 2px;border-bottom:1px dashed #e6d3b5}#qCard .qr i{font-style:normal;width:16px;color:#b08a5a}
   #qCard .qr.ok{opacity:.55}#qCard .qr.ok i{color:#2e9b5a}#qCard .qr span{flex:1;line-height:1.25}#qCard .qr small{color:#a0522d;font-weight:700}
@@ -958,6 +958,14 @@
   .selfie .sf-ring{position:absolute;inset:0;border-radius:50%;box-shadow:inset 0 0 0 6px #f3c34a}
   .big-num{font-size:44px;font-weight:900;color:#2e9b5a;text-align:center;margin:6px 0}
   label.btnlink{display:flex;align-items:center;justify-content:center;padding:9px;border-radius:12px;background:#f3ead8;color:#3a2a1a;font-weight:800;border:1.5px solid #d7b07a;cursor:pointer}
+  @media (max-width:600px){.citymap{height:auto!important;aspect-ratio:auto!important;display:grid;grid-template-columns:repeat(2,1fr);gap:7px;padding:8px;background:#CFE7D2;border-radius:14px}.citymap svg,.citymap .cpin.home{display:none}.citymap .cpin{position:static;transform:none!important;min-width:0;width:100%}}
+  #helpBtn,#muteBtn{z-index:29}   /* misafir: ev sahibinin açık penceresi varken de menüye ulaşılabilsin */
+  /* uzun pencerelerde alttaki Geri/Kapat/Devam düğmeleri hep görünsün (kaydırmadan) */
+  .modal > .btns:last-child, .modal > div:last-child > .btns:last-child{position:sticky;bottom:-22px;margin:10px -24px -22px;padding:10px 24px 14px;background:linear-gradient(180deg,rgba(255,248,236,0),var(--paper,#fff8ec) 28%);z-index:3}
+  body.compact .modal > .btns:last-child, body.compact .modal > div:last-child > .btns:last-child{bottom:-16px;margin:8px -16px -16px;padding:8px 16px 12px}
+  #overlay.phone-ov .modal > .btns:last-child, #overlay.phone-ov .modal > div:last-child > .btns:last-child, .prev-ov .btns{position:static;background:none;margin:0;padding:0}
+  #terBtn{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));z-index:9;padding:8px 14px;border-radius:999px;background:#2a9d8f;color:#fff;font-weight:800;border:2px solid #1d6f66;box-shadow:0 3px 0 #145149;display:none}
+  body.touchdev #terBtn{bottom:calc(150px + env(safe-area-inset-bottom))}
 </style>
 
 </head>
@@ -1254,7 +1262,13 @@ function readSlot(id){
   }
   return null;
 }
-function applyPrefs(s){ s.muted = prefs.muted; s.hintMode = prefs.hintMode; s.learned = prefs.learned; return s; }
+function sanitizeSave(s){   // bozuk/eski kayıt güvenliği: seviye en fazla 5 (sonrası mekân), sayılar NaN olmasın
+  if (!s) return s;
+  if (typeof s.level === "number" && s.level > 5){ s.venue = Math.max(s.venue || 5, s.level); s.level = 5; }
+  ["money", "diamonds", "mood", "day", "shifts", "levelEarn"].forEach(k => { if (k in s && (typeof s[k] !== "number" || !isFinite(s[k]))) s[k] = k === "day" ? 1 : k === "mood" ? 70 : 0; });
+  return s;
+}
+function applyPrefs(s){ sanitizeSave(s); s.muted = prefs.muted; s.hintMode = prefs.hintMode; s.learned = prefs.learned; return s; }
 /* eski tek kayıt → hikâye yuvası */
 (function migrate(){
   if (prefs.migrated) return;
@@ -1290,6 +1304,8 @@ function useTempSlot(){ curSlot = null; save = applyPrefs(clone(save)); }
 function deleteSlot(id){ try { localStorage.removeItem(SLOT_PREFIX + id); localStorage.removeItem(SLOT_PREFIX + id + ":bak"); } catch(e){} writeIndex(slotIndex().filter(x => x.id !== id)); }
 function writeSave(){
   if (previewBackup) return;
+  if (save && !isFinite(save.money)){ console.warn("money NaN düzeltildi"); save.money = 0; }
+  if (save && !isFinite(save.diamonds)) save.diamonds = 0;
   prefs.muted = !!save.muted; prefs.hintMode = save.hintMode || "auto"; prefs.learned = save.learned || prefs.learned;
   writePrefs();
   if (!curSlot) return;
@@ -1921,6 +1937,7 @@ function makeLabel(cls){
 const _v = new THREE.Vector3();
 function place(el, x, y, z){
   el._w = [x, y, z];
+  if (V && V.stair && mode === "game" && ((y > FLOOR_Y + V.stair.h + 1.0 ? 1 : 0) !== viewFl) && !el.classList.contains("keepfl")){ el.style.display = "none"; el._proj = 1; return; }   // diğer kattaki etiketler gizli
   _v.set(x, y, z).project(camera);
   if (_v.z > 1 || _v.z < -1){ el.style.display = "none"; el._proj = 1; return; }
   el._proj = 0;
@@ -1967,6 +1984,7 @@ function declutterLabels(){
    ===================================================================== */
 const scene = new THREE.Scene();
 const skyTex = {};
+let wcRect = null;   // restoran tuvaletinin alanı (dekorlar içine düşmesin)
 function setSky(top, mid, bot, fogColor){
   const k = top + mid + bot;
   if (!skyTex[k]) skyTex[k] = tex(4, 256, (g, w, h) => {
@@ -2232,7 +2250,7 @@ function buildMall(F){
   const shops = [["MODA", "#f273b4"], ["KİTAP", "#3a7be0"], ["KAHVE", "#8b5e3c"], ["OYUNCAK", "#f5b335"], ["ELEKTRONİK", "#2fb5c9"], ["SPOR", "#43c06a"], ["SİNEMA", "#9a63e0"]];
   shops.forEach(([name, col], i) => {
     const side = i < 3 ? -1 : 1, k = i < 3 ? i : i - 3;
-    const x = side < 0 ? -18.5 - 1.6 * Math.min(3, ((save.expand || {}).office) || 0) : 13.5, z = -9 + k * 7.5;     // sol dükkânlar büyük ofise yer açmak için daha dışarıda
+    const x = side < 0 ? -24.7 - 3.2 * Math.min(3, ((save.expand || {}).office) || 0) : 13.5, z = -9 + k * 7.5;     // sol dükkânlar büyük ofise yer açmak için daha dışarıda
     const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = -side * Math.PI / 2; P.add(g);
     mk(BOX(6.5, 4.5, 2), M(0xf6f1ea, { r: .6 }), 0, 2.25, -1, g);
     mk(BOX(5.6, 2.6, .1), M(0x9fd8ff, { r: .1, t: .45 }), 0, 1.4, .05, g, false);
@@ -2243,8 +2261,9 @@ function buildMall(F){
   [[-5, F + 3.4, 0], [5, F + 3.4, 0]].forEach(([x, z, r]) => bench(x, z, r, P));
   // 2. kat: galeri, cam korkuluk, yürüyen merdiven ve restoranın tam üstünde bir dükkân daha
   const H2 = 4.7, slabM = M(0xf3eee6, { r: .55 }), glassR = M(0xcfeaff, { r: .1, t: .35 }), chromeM = M(0xc9ced6, { r: .25, m: .8 });
-  [-1, 1].forEach(side => { const o = side < 0 ? -5 : 0; mk(BOX(9, .3, 26), slabM, side * 15.2 + o, H2, -1.5, P, false, true); mk(BOX(.08, 1, 26), glassR, side * 10.75 + o, H2 + .65, -1.5, P, false); mk(BOX(.06, .06, 26), chromeM, side * 10.75 + o, H2 + 1.17, -1.5, P, false); });
-  shops.forEach(([name], i) => { const side = i < 3 ? -1 : 1, k = i < 3 ? i : i - 3, x = side < 0 ? -20.5 : 15.5, z = -9 + k * 7.5;
+  const mOFL = Math.min(3, ((save.expand || {}).office) || 0);   // sol galeri ofis/çağrı merkezi/tuvaletin üstünü kapatmasın
+  [-1, 1].forEach(side => { const o = side < 0 ? -11.8 - 3.2 * mOFL : 0; mk(BOX(9, .3, 26), slabM, side * 15.2 + o, H2, -1.5, P, false, true); mk(BOX(.08, 1, 26), glassR, side * 10.75 + o, H2 + .65, -1.5, P, false); mk(BOX(.06, .06, 26), chromeM, side * 10.75 + o, H2 + 1.17, -1.5, P, false); });
+  shops.forEach(([name], i) => { const side = i < 3 ? -1 : 1, k = i < 3 ? i : i - 3, x = side < 0 ? -26.7 - 3.2 * Math.min(3, ((save.expand || {}).office) || 0) : 15.5, z = -9 + k * 7.5;
     const g = new THREE.Group(); g.position.set(x, H2 + .15, z); g.rotation.y = -side * Math.PI / 2; P.add(g);
     const up = [["BUTİK", "#c95a7a"], ["TATLICI", "#e76f51"], ["KUAFÖR", "#7b2cbf"], ["OYUN SALONU", "#2a9d8f"], ["PARFÜM", "#d4a017"], ["SAAT", "#264653"]][i % 6];
     mk(BOX(6.5, 3.6, 2), M(0xf6f1ea, { r: .6 }), 0, 1.8, -1, g); mk(BOX(5.6, 2.2, .1), M(0x9fd8ff, { r: .1, t: .45 }), 0, 1.2, .05, g, false);
@@ -2262,7 +2281,7 @@ function buildMall(F){
       [-1, 1].forEach(s => mk(CYL(.17, .17, .05, 12), M(0xf4acb7, { r: .7 }), s * .55, .45, 0, t)); }
     [-7.6, 7.6].forEach(x => pot(x, -1.6, true, g)); }
   // yürüyen merdiven
-  { const e = new THREE.Group(); e.position.set(-11.2, 0, -10.5); P.add(e);
+  { const e = new THREE.Group(); e.position.set(-23.8 - 3.2 * mOFL, 0, -10.5); P.add(e);
     const st = mk(BOX(1.3, .25, 7), M(0x8a9099, { r: .4, m: .5 }), 0, H2 / 2, 0, e); st.rotation.x = -Math.atan2(H2, 6.6);
     [-1, 1].forEach(s => { const r = mk(BOX(.08, .9, 7.1), glassR, s * .66, H2 / 2 + .5, 0, e, false); r.rotation.x = st.rotation.x; }); }
   const back = mk(BOX(60, 9.6, 1), M(0xf6f1ea, { r: .7 }), 0, 4.8, -14, P, false, true);
@@ -2334,7 +2353,8 @@ function makeStation(type, id, x, z, rotY, th = {}){
   const g = new THREE.Group(); g.position.set(x, FLOOR_Y, z); g.rotation.y = rotY; world.add(g);
   const cab = th.cab || 0xf3efe8, regCol = th.reg || 0x4f8fba;
   const s = { id, type, x, z, rot: rotY, group: g, range: CFG.interactRange };
-  if (WORK && skinStation(type, g, s, th)){ /* işletmeye özel makine kuruldu */ }
+  if (type === "wc"){ /* tuvalet kapısı: kabin buildRestaurant'ta kurulur */ }
+  else if (WORK && skinStation(type, g, s, th)){ /* işletmeye özel makine kuruldu */ }
   else switch (type){
     case "register":
       cabinet(g, regCol);
@@ -2639,7 +2659,8 @@ function buildRestaurant(){
   const key = L === 2 ? "mahalle" : L === 3 ? "gurme" : L === 4 ? "avm" : save.city;
   const th = themeFor(key);
   // 18 × 11,4 m: arkada mutfak + ofis, önde ferah salon (masalar arası 1,5 m koridor)
-  const EX = WORK ? Math.min(2, Math.max(0, save.level - 3)) : Math.min(save.level >= 5 ? 14 : 3, (((save.expand || {}).salon) || 0) + venueSalon());   // Lv5+: salon sınırsız büyür       // salon genişletme: her seviye +2,6 m ve bir sıra masa
+  const TX = WORK || L < 3 ? 0 : Math.min(L >= 5 ? 99 : 6, ((save.expand || {}).tablesX) || 0), EXR = Math.ceil(TX / 3);   // tek tek eklenen masalar: her 3 masa ön tarafa yeni bir sıra açar
+  const EX = EXR + (WORK ? Math.min(2, Math.max(0, save.level - 3)) : Math.min(save.level >= 5 ? 14 : 3, (((save.expand || {}).salon) || 0) + venueSalon()));   // Lv5+: salon sınırsız büyür       // salon genişletme: her seviye +2,6 m ve bir sıra masa
   const W = 18, X = 9, ZB = 5, Z = 6.4 + EX * 2.6, D = Z + ZB, ZC = (Z - ZB) / 2, DOOR = .5;
   const laneX = F.drive ? X + 2.6 : null;
   if (L === 4) buildMall(Z);
@@ -2658,7 +2679,12 @@ function buildRestaurant(){
   mk(BOX(W + .4, .15, D + .4), [M(0xd8cfc0), M(0xd8cfc0), stdMap(floorTexture(th.floor), th.floor === "marble" ? .2 : .5), M(0xd8cfc0), M(0xd8cfc0), M(0xd8cfc0)], 0, 0, ZC, world, false, true);
   const backW = wall(0, -ZB, W, 0, new THREE.Vector3(0, 0, -1), th);
   // sol duvar: ofise açılan geniş kapı boşluğu (z -4.6 … -2.9)
-  const leftW = wall(-X, (Z - 2.9) / 2, Z + 2.9, Math.PI / 2, new THREE.Vector3(-1, 0, 0), th);
+  // 🚻 TUVALET: ofisin önünde, dükkânın solunda ayrı oda; salondan sol duvardaki kapıyla girilir; seviye/mekân büyüdükçe büyür
+  const OFLw = WORK ? 0 : Math.min(3, ((save.expand || {}).office) || 0), wcLv = WORK ? 0 : clamp((L - 2) + (L >= 5 ? Math.floor((venueNo() - 5) / 4) : 0), 0, 7);
+  const wz0 = .6 + OFLw * .8 + .25, wDd = Math.min(2.6 + wcLv * .35, Z - .35 - wz0), wz1 = wz0 + wDd, wWd = 2.6 + wcLv * .8, wx1 = -X - .12, wx0 = wx1 - wWd;
+  const wdz = wz0 + 1.05 + (wDd - 1.6) / 2;
+  const leftW = wall(-X, (wdz - .55 - 2.9) / 2, wdz - .55 + 2.9, Math.PI / 2, new THREE.Vector3(-1, 0, 0), th), leftW2 = wall(-X, (wdz + .55 + Z) / 2, Z - wdz - .55, Math.PI / 2, new THREE.Vector3(-1, 0, 0), th);
+  { const li = mk(BOX(.3, .5, 1.12), M(th.trim, { r: .5 }), -X, 2.45, wdz, world); fadeable(li); }
   wall(-X, -4.8, .4, Math.PI / 2, new THREE.Vector3(-1, 0, 0), th);
   mk(BOX(.3, .25, 1.8), M(th.trim, { r: .5 }), -X, 2.6, -3.75, world);
   const rightW = wall(X, ZC, D, -Math.PI / 2, new THREE.Vector3(1, 0, 0), th);
@@ -2678,7 +2704,8 @@ function buildRestaurant(){
   mk(BOX(1.6, .32, .8), steel, 5.3, 2.25, .5, backW.upper); mk(BOX(.4, .4, .4), steel, 5.3, 2.55, .3, backW.upper);
   [-3.4, 2.4].forEach(x => mk(CYL(.14, .2, .2, 16), M(0xffe9b8, { e: 0xffd27a, ei: .7, r: .4 }), x, 2.35, .25, backW.upper));
   // yan duvarlar: tablolar ve pencereler
-  [[-3.2, 0], [3.4, 1]].forEach(([x, v]) => mk(new THREE.PlaneGeometry(1, .76), stdMap(pictureTex(v + L)), x, 1.95, .125, leftW.upper, false));
+  if (wdz - .55 + 2.9 > 1.6) mk(new THREE.PlaneGeometry(1, .76), stdMap(pictureTex(L)), 0, 1.95, .125, leftW.upper, false);
+  if (Z - wdz - .55 > 1.6) mk(new THREE.PlaneGeometry(1, .76), stdMap(pictureTex(1 + L)), 0, 1.95, .125, leftW2.upper, false);
   mk(new THREE.PlaneGeometry(2.4, 1.0), M(0xbfe6ff, { r: .1, m: .1, t: .55 }), -3.2, 1.85, .125, rightW.upper, false);
   // ön tezgâh (bar): kasa, paket, teslim + sol uçta kapalı bölüm
   makeStation("register", "register", -5.85, -1.0, Math.PI, th);
@@ -2713,8 +2740,10 @@ function buildRestaurant(){
   const ofl = mk(new THREE.PlaneGeometry(OX1 - OX0, OZ1 - OZ0), stdMap(T("officeFloor", 128, 128, (g, w, h) => { g.fillStyle = "#6b4a33"; g.fillRect(0, 0, w, h); for (let i = 0; i < 8; i++){ g.fillStyle = i % 2 ? "#74503a" : "#5f412d"; g.fillRect(0, i * 16, w, 15); } }, [2, 2]), .6), ocx, FLOOR_Y + .003, ocz, offW, false, true); ofl.rotation.x = -Math.PI / 2;
   const owM = M(0xeae3d6, { r: .7 }), otM = M(th.trim, { r: .5 }), glass = M(0xbfe6ff, { r: .1, m: .1, t: .45 });
   mk(BOX(OX1 - OX0, 2.4, .2), owM, ocx, 1.2, OZ0, offW);                                   // arka duvar
-  mk(BOX(.2, 2.4, OZ1 - OZ0), owM, OX0, 1.2, ocz, offW);                                    // dış duvar
-  mk(BOX(.06, 1.1, 3.6), glass, OX0 + .02, 1.5, ocz, offW, false);                          // pencere
+  const DZ0 = OZ1 - 1.8, DZ1 = OZ1 - .6;                                                     // çağrı merkezine iç kapı
+  mk(BOX(.2, 2.4, DZ0 - OZ0), owM, OX0, 1.2, (OZ0 + DZ0) / 2, offW); mk(BOX(.2, 2.4, OZ1 - DZ1), owM, OX0, 1.2, (OZ1 + DZ1) / 2, offW);   // dış duvar (kapılı)
+  mk(BOX(.2, .4, DZ1 - DZ0), owM, OX0, 2.2, (DZ0 + DZ1) / 2, offW);                         // kapı üstü
+  mk(BOX(.06, 1.1, 2.0), glass, OX0 + .02, 1.5, ocz - .8, offW, false);                     // pencere
   mk(BOX(OX1 - OX0, 1.0, .2), owM, ocx, .5, OZ1, offW); mk(BOX(OX1 - OX0, .9, .05), glass, ocx, 1.45, OZ1, offW, false);    // ön: alçak duvar + cam
   mk(BOX(OX1 - OX0 + .2, .1, .3), otM, ocx, 1.05, OZ1, offW);
   const otx = signTexture("OFİS", "#1f3b52", "#ffffff", "#ffffff"); mk(BOX(1.3, .4, .08), [M(0x2b2f36), M(0x2b2f36), M(0x2b2f36), M(0x2b2f36), stdMap(otx, .6, { emissive: lin(0xffffff), emissiveMap: otx, emissiveIntensity: .4 }), M(0x2b2f36)], ocx, 2.2, OZ1 + .12, offW);
@@ -2722,9 +2751,28 @@ function buildRestaurant(){
   const rug = mk(new THREE.PlaneGeometry(4.2, 3.2), M(0x8a3b3b, { r: .95 }), ocx + .3, FLOOR_Y + .008, ocz + .2, offW, false, true); rug.rotation.x = -Math.PI / 2;
   mk(new THREE.PlaneGeometry(3.9, 2.9), M(0xc9a227, { r: .95 }), ocx + .3, FLOOR_Y + .01, ocz + .2, offW, false, true).rotation.x = -Math.PI / 2;
   mk(BOX(2.2, 1.1, .05), M(0xffffff, { r: .3 }), ocx - 1.2, 1.55, OZ0 + .13, offW, false); mk(BOX(2.3, 1.2, .03), M(0x9aa6b2), ocx - 1.2, 1.55, OZ0 + .11, offW, false);
-  [[OX0 + .45, OZ0 + .45], [OX0 + .45, OZ1 - .45], [OX1 - .5, OZ1 - .45]].forEach(([x, z]) => { const pp = pot(x, z, true); pp.scale.setScalar(1.3); });
-  { const sf = M(0x2f4858, { r: .8 }); mk(BOX(.8, .42, 2.1), sf, OX0 + .55, .26, ocz + .6, offW); mk(BOX(.2, .55, 2.1), sf, OX0 + .25, .6, ocz + .6, offW); }
-  offW.children.forEach(fadeable);
+  [[OX0 + .45, OZ0 + .45], [OX1 - .5, OZ1 - .45]].forEach(([x, z]) => { const pp = pot(x, z, true); pp.scale.setScalar(1.3); });
+  { const sf = M(0x2f4858, { r: .8 }); mk(BOX(.8, .42, 2.1), sf, OX0 + .55, .26, ocz - .4, offW); mk(BOX(.2, .55, 2.1), sf, OX0 + .25, .6, ocz - .4, offW); }
+  // ÇAĞRI MERKEZİ: ofisle aynı boyutta ayrı oda (ofisin solunda); ofisten iç kapıyla girilir
+  const CX1 = OX0, CX0 = OX0 - (OX1 - OX0), ccx = (CX0 + CX1) / 2, cw = new THREE.Group(); world.add(cw);
+  mk(BOX(CX1 - CX0 + .3, .15, OZ1 - OZ0 + .3), M(0xd8cfc0), ccx, 0, ocz, cw, false, true);
+  mk(new THREE.PlaneGeometry(CX1 - CX0, OZ1 - OZ0), stdMap(T("callFloor", 128, 128, (g, w, h) => { g.fillStyle = "#3d4f63"; g.fillRect(0, 0, w, h); g.strokeStyle = "#4b6078"; g.lineWidth = 2; for (let i = 0; i <= 4; i++){ g.beginPath(); g.moveTo(i * 32, 0); g.lineTo(i * 32, h); g.stroke(); g.beginPath(); g.moveTo(0, i * 32); g.lineTo(w, i * 32); g.stroke(); } }, [3, 3]), .9), ccx, FLOOR_Y + .003, ocz, cw, false, true).rotation.x = -Math.PI / 2;
+  const cwM = M(0xdfe6ee, { r: .7 });
+  mk(BOX(CX1 - CX0, 2.4, .2), cwM, ccx, 1.2, OZ0, cw); mk(BOX(.2, 2.4, OZ1 - OZ0), cwM, CX0, 1.2, ocz, cw);
+  mk(BOX(.06, 1.1, 3.0), glass, CX0 + .02, 1.5, ocz, cw, false);
+  mk(BOX(CX1 - CX0, 1.0, .2), cwM, ccx, .5, OZ1, cw); mk(BOX(CX1 - CX0, .9, .05), glass, ccx, 1.45, OZ1, cw, false); mk(BOX(CX1 - CX0 + .2, .1, .3), otM, ccx, 1.05, OZ1, cw);
+  { const ctx = signTexture("ÇAĞRI MERKEZİ", "#5a2a8a", "#ffffff", "#e0c8ff"); mk(BOX(2.2, .4, .08), [M(0x2b2f36), M(0x2b2f36), M(0x2b2f36), M(0x2b2f36), stdMap(ctx, .6, { emissive: lin(0xffffff), emissiveMap: ctx, emissiveIntensity: .45 }), M(0x2b2f36)], ccx, 2.2, OZ1 + .12, cw); }
+  mk(BOX(2.4, 1.0, .05), M(0x9a63e0, { e: 0x9a63e0, ei: .25 }), ccx, 1.6, OZ0 + .13, cw, false);   // sipariş ekranı
+  const callSpots = [], callObst = [], deskM = M(0xf3f1ec, { r: .5 }), scrM = M(0x1b2633, { e: 0x3d8bff, ei: .5 });
+  [OZ0 + 1.15, OZ0 + 3.0].forEach(dz => { for (let dx = CX0 + 1.05; dx < CX1 - 1.0; dx += 1.6){
+    const g = new THREE.Group(); g.position.set(dx, 0, dz); cw.add(g);
+    mk(BOX(1.25, .07, .7), deskM, 0, .74, 0, g); [-.55, .55].forEach(s => mk(BOX(.06, .72, .6), deskM, s, .37, 0, g));
+    mk(BOX(.55, .34, .04), scrM, 0, 1.0, -.18, g); mk(BOX(.08, .16, .08), M(0x2b2f36), 0, .82, -.2, g);
+    mk(BOX(.36, .02, .14), M(0x2b2f36), 0, .785, .05, g);
+    const ch = mk(BOX(.46, .08, .46), M(0x5a2a8a, { r: .6 }), 0, .45, .72, g); mk(BOX(.46, .5, .07), M(0x5a2a8a, { r: .6 }), 0, .72, .95, g); mk(CYL(.04, .04, .4, 6), M(0x2b2f36), 0, .22, .72, g);
+    callSpots.push(new THREE.Vector3(dx, .03, dz + .62)); callObst.push({ x0: dx - .66, x1: dx + .66, z0: dz - .38, z1: dz + .38 }); } });
+  cw.children.forEach(o => { if (o.isMesh && o.position.y > .2) fadeable(o); });   // zemin ve masalar solmasın, sadece duvarlar
+  offW.children.forEach(o => { if (o.position.y > .2) fadeable(o); });   // zemin şeffaflaşmasın, sadece duvar/cam
   makeStation("office", "office", -10.8, -4.25, 0, th);
   // eski ofis köşesi artık salonun parçası: bitkiler
   pot(7.4, -3.2, true); pot(8.5, -4.4, true);
@@ -2742,7 +2790,30 @@ function buildRestaurant(){
   rowsZ.forEach((z, ri) => cols.forEach(x => tpos.push([x - (prof.stagger && ri % 2 ? .6 : 0), z])));
   if (L < 3){ let add = extraT; for (let i = tpos.length - 1; i >= 0; i--) if (tpos[i][0] === 7.2){ if (add > 0) add--; else tpos.splice(i, 1); } }
 
+  if (TX % 3){ const zl = rowsZ[rowsZ.length - 1], keep = [7.2, -2.0].slice(0, TX % 3); for (let i = tpos.length - 1; i >= 0; i--) if (Math.abs(tpos[i][1] - zl) < .01 && !keep.some(k => Math.abs(tpos[i][0] + (prof.stagger && (rowsZ.length - 1) % 2 ? .6 : 0) - k) < .01)) tpos.splice(i, 1); }
   tpos.forEach(([x, z], i) => makeTable("table" + (i + 1), x, z, th));
+  const wg = new THREE.Group(); world.add(wg);
+  const wcStalls = Math.max(1, Math.floor((wWd - .4) / 1.05)), wcSinks = Math.max(1, Math.min(wcStalls, Math.floor((wWd - 1.4) / .9)));
+  { const wcW = M(0xe8f1f5, { r: .6 }), wcx = (wx0 + wx1) / 2, wcz = (wz0 + wz1) / 2, por = M(0xffffff, { r: .2 }), chrome = M(0xc0c6cc, { m: .7, r: .3 });
+    const tileT = T("wcTile", 64, 64, (g, w, h) => { g.fillStyle = "#dfe9ee"; g.fillRect(0, 0, w, h); g.strokeStyle = "#b9c9d2"; g.lineWidth = 2; for (const [a, b] of [[0, 0], [32, 0], [0, 32], [32, 32]]) g.strokeRect(a, b, 32, 32); }, [4, 4]);
+    mk(BOX(wWd + .3, .15, wDd + .3), M(0xd8cfc0), wcx, 0, wcz, wg, false, true);
+    mk(new THREE.PlaneGeometry(wWd, wDd), stdMap(tileT, .4), wcx, FLOOR_Y + .004, wcz, wg, false, true).rotation.x = -Math.PI / 2;
+    const ws = [mk(BOX(wWd + .2, 2.4, .2), wcW, wcx, 1.2, wz0, wg), mk(BOX(.2, 2.4, wDd), wcW, wx0, 1.2, wcz, wg), mk(BOX(wWd + .2, 1.0, .2), wcW, wcx, .5, wz1, wg)];
+    ws.push(mk(BOX(wWd + .2, .9, .05), M(0xd6ecf5, { r: .1, m: .1, t: .5 }), wcx, 1.45, wz1, wg, false));   // buzlu cam
+    ws.forEach(fadeable);
+    const st = signTexture("🚻 WC", "#1d6fa5", "#ffffff", "#bfe6ff"); mk(BOX(.06, .34, .8), [M(0x2b2f36), stdMap(st, .5, { emissive: lin(0xffffff), emissiveMap: st, emissiveIntensity: .4 }), M(0x2b2f36), M(0x2b2f36), M(0x2b2f36), M(0x2b2f36)], -X + .14, 2.45, wdz, world);
+    for (let i = 0; i < wcStalls; i++){ const sx = wx1 - .7 - i * 1.05;      // kabinler: klozet + bölme + kapı
+      mk(BOX(.42, .38, .5), por, sx, .2, wz0 + .45, wg); mk(CYL(.21, .19, .1, 16), por, sx, .42, wz0 + .55, wg); mk(BOX(.42, .5, .16), por, sx, .55, wz0 + .18, wg);
+      const pt = mk(BOX(.05, 1.8, 1.0), M(0x7fb3c8, { r: .5 }), sx - .52, .95, wz0 + .5, wg); fadeable(pt);
+      if (wcLv >= 3) mk(BOX(.3, .02, .2), M(0xc9a227, { m: .8, r: .3 }), sx + .3, 1.0, wz0 + .1, wg, false); }
+    for (let i = 0; i < wcSinks; i++){ const sx = wx1 - .8 - i * .9;   // lavabolar + aynalar
+      mk(BOX(.6, .1, .4), wcLv >= 4 ? M(0x2b2f36, { r: .2 }) : por, sx, .86, wz1 - .32, wg); mk(CYL(.03, .03, .86, 8), chrome, sx, .43, wz1 - .32, wg); mk(CYL(.02, .02, .18, 6), chrome, sx, .98, wz1 - .45, wg); }
+    if (wcLv >= 2) pot(wx0 + .35, wz1 - .35, true).scale.setScalar(.8);
+    if (wcLv >= 5){ const ly = mk(BOX(wWd - .6, .04, .3), M(0xfff1c1, { e: 0xffd27a, ei: .8 }), wcx, 2.35, wcz, wg, false); }
+    var wcDirt = mk(CYL(.38, .38, .01, 14), M(0x7a6a3a, { r: 1, t: .6 }), wx1 - 1.2, FLOOR_Y + .015, wdz, wg, false, true); wcDirt.visible = false; }
+  makeStation("wc", "wc", -X + .1, wdz, -Math.PI / 2, th);
+  const wcInfo = { door: new THREE.Vector3(-X + .75, .03, wdz), inside: new THREE.Vector3(wx1 - Math.min(1.4, wWd / 2), .03, wdz), dirt: wcDirt, idle: new THREE.Vector3(-7.4, .03, wdz + 1.1), lv: wcLv, stalls: wcStalls,
+    obst: [{ x0: wx0 - .3, x1: wx1 + .02, z0: wz0 - .2, z1: wz0 + .95 }, { x0: wx0 - .3, x1: wx1 + .02, z0: wz1 - .55, z1: wz1 + .2 }, { x0: wx0 - .3, x1: wx0 + .15, z0: wz0, z1: wz1 }] };
   addRestDecor({ x0: -8.6, x1: 6.5, z0: -.4, z1: Z - .2 });
   if (WORK) workDecor(Z, X, DOOR);
   try { venueFlags(Z, X, DOOR); } catch(e){ console.warn("flags", e); }
@@ -2759,16 +2830,21 @@ function buildRestaurant(){
   // sınırlar ve engeller
   const obst = [{ x0: -8.95, x1: 3.9, z0: -1.4, z1: -.6 },
     { x0: -6.25, x1: 8.9, z0: -5.3, z1: -3.75 },                                 // mutfak arka sırası
-    { x0: -9.2, x1: -8.8, z0: -5.3, z1: -4.6 }, { x0: -9.2, x1: -8.8, z0: -2.9, z1: Z + 1 },   // sol duvar (ofis kapısı arası boş)
-    { x0: OX0 - .6, x1: -9.2, z0: OZ1 - .15, z1: Z + 4 }, { x0: OX0 - .6, x1: OX0 + .6, z0: -5.3, z1: OZ1 },   // ofisin dışı
-    { x0: OX0, x1: -9.0, z0: -5.3, z1: -4.85 }, { x0: 7.0, x1: 7.8, z0: -3.6, z1: -2.8 }, { x0: 8.1, x1: 8.9, z0: -4.8, z1: -4.0 }];
-  stations.forEach(s => { if (s.z < -3.9 && s.type !== "office") return; if (["register", "window", "counter"].includes(s.type) && s.z > -1.5) return; obst.push(stationFootprint(s)); });
-  V = { kind: "shop", L, bounds: { x0: OX0 + .3, x1: 8.55, z0: -4.75, z1: Z - .45 }, obst,
-    cam: { x: -.6, y: .6, z: .9 + Math.min(EX, 4) * 1.3, r: 28 + Math.min(EX, 4) * 3 },
+    { x0: -9.2, x1: -8.8, z0: -5.3, z1: -4.6 }, { x0: -9.2, x1: -8.8, z0: -2.9, z1: wdz - .55 }, { x0: -9.2, x1: -8.8, z0: wdz + .55, z1: Z + 1 },   // sol duvar (ofis ve tuvalet kapıları boş)
+    { x0: CX0 - .6, x1: -9.2, z0: OZ1 - .15, z1: wz0 + .1 }, { x0: CX0 - .6, x1: wx0 + .12, z0: wz0, z1: Z + 4 }, { x0: wx0, x1: -9.2, z0: wz1 - .1, z1: Z + 4 },   // dış alan (tuvalet hariç) { x0: CX0 - .6, x1: CX0 + .25, z0: -5.3, z1: OZ1 },   // ofis + çağrı merkezinin dışı
+    { x0: OX0 - .25, x1: OX0 + .2, z0: -5.3, z1: DZ0 }, { x0: OX0 - .25, x1: OX0 + .2, z0: DZ1, z1: OZ1 }, { x0: OX0 + .1, x1: OX0 + 1.0, z0: ocz - 1.5, z1: ocz + .7 },   // ofis–çağrı duvarı (kapılı) + kanepe
+    ...callObst,
+    { x0: CX0, x1: -9.0, z0: -5.3, z1: -4.85 }, { x0: 7.0, x1: 7.8, z0: -3.6, z1: -2.8 }, { x0: 8.1, x1: 8.9, z0: -4.8, z1: -4.0 }];
+  obst.push(...wcInfo.obst);
+  const TR = hasTerrace() ? buildTerrace(Z, X, th) : null;
+  if (TR) obst.push(...TR.ground);
+  stations.forEach(s => { if (s.type === "wc" || s.fl) return; if (s.z < -3.9 && s.type !== "office") return; if (["register", "window", "counter"].includes(s.type) && s.z > -1.5) return; obst.push(stationFootprint(s)); });
+  V = { kind: "shop", L, wc: wcInfo, stair: TR && TR.stair, upG: TR && TR.upG, obst2: TR && TR.obst2, sObst: TR && TR.sObst, bounds2: TR && TR.bounds2, callSpots, callX1: CX1, callDoor: [new THREE.Vector3(OX0 + .75, .03, (DZ0 + DZ1) / 2), new THREE.Vector3(OX0 - .75, .03, (DZ0 + DZ1) / 2)], bounds: { x0: CX0 + .3, x1: 8.55, z0: -4.75, z1: Z - .45 }, obst,
+    cam: { x: -.6, y: .6, z: .9 + EX * 1.3, r: EX <= 4 ? 28 + EX * 3 : 40 + (EX - 4) * 4.8 },   // dükkân büyüdükçe kamera tamamını sığdıracak kadar geri çekilir
     spawn: new THREE.Vector3(-18, .03, Z + 2.0), exit: [new THREE.Vector3(DOOR, .03, Z - 1.5), new THREE.Vector3(DOOR, .03, Z + 1.2), new THREE.Vector3(18, .03, Z + 2.0)],
     enter: [new THREE.Vector3(DOOR, .03, Z + 1.2), new THREE.Vector3(DOOR, .03, Z - 1.5), new THREE.Vector3(DOOR, .03, .5)],
     frontZ: Z,
-    queueSpot: i => new THREE.Vector3(-5.85, .03, -.05 + i * .95),
+    queueSpot: i => { const qm = TR ? Math.max(3, Math.floor((TR.stair.zs0 - .55) / .95)) : 99; return i <= qm ? new THREE.Vector3(-5.85, .03, -.05 + i * .95) : new THREE.Vector3(-3.95, .03, -.05 + (qm - (i - qm - 1)) * .95); },
     waitSpot: j => new THREE.Vector3(-4.5 + (j % 2) * .85, .03, .75 + Math.floor(j / 2) * .85),
     laneX, driveZ: -1.6, komiIdle: new THREE.Vector3(7.6, .03, .3), staffIdle: [new THREE.Vector3(7.6, .03, .3), new THREE.Vector3(-1.6, .03, -2.4), new THREE.Vector3(4.6, .03, .3), new THREE.Vector3(-7.6, .03, -2.2)],
     officeSpot: new THREE.Vector3(-10.8, .03, -3.4),
@@ -2777,8 +2853,78 @@ function buildRestaurant(){
 
 /* sahneyi seviyeye göre kur */
 function buildVenue(){
+  wcRect = null;
   clearWorld();
   if (save.level === 1) buildBufe(); else buildRestaurant();
+}
+
+/* =====================================================================
+   🏙️ TERAS KATI: bazı mekânlarda satın alınan üst kat (alt katla aynı boyutta, açık hava)
+   merdiven salonun ön-sol köşesinde; personel, müşteriler ve oyuncular çıkabilir
+   ===================================================================== */
+const TER_H = 3.2;
+const terraceOK = () => !WORK && save.level >= 5 && venueNo() >= 8 && venueNo() % 3 !== 1;
+const hasTerrace = () => terraceOK() && !!(save.terr || {})[venueNo()];
+let viewFl = 0, viewManual = null, lastPf = 0;
+function buildTerrace(Z, X, th){
+  const H = TER_H, xb = -4.6, xt = -7.9, zs0 = Z - 1.35, zs1 = Z - .2, zm = (zs0 + zs1) / 2, Y = FLOOR_Y + H;
+  const upG = new THREE.Group(); world.add(upG);
+  // merdiven (her iki görünümde de görünür)
+  const stG = new THREE.Group(); world.add(stG); const N = 14, stepW = (xb - xt) / N, wood = M(0x8a5a3a, { r: .6 }), steel = M(0x2b2f36, { r: .4, m: .5 });
+  for (let i = 0; i < N; i++){ const x = xb - (i + .5) * stepW, y = (i + 1) * H / N; mk(BOX(stepW + .02, .08, zs1 - zs0), wood, x, FLOOR_Y + y - .04, zm, stG); mk(BOX(.02, y, zs1 - zs0), M(0xd9cbb5, { r: .7 }), x + stepW / 2, FLOOR_Y + y / 2, zm, stG, false); }
+  const rail = mk(BOX(xb - xt, .06, .06), steel, (xb + xt) / 2, FLOOR_Y + H / 2 + 1.0, zs0 + .03, stG); rail.rotation.z = Math.atan2(H, xb - xt);
+  for (let i = 0; i <= 4; i++){ const x = xb - i * (xb - xt) / 4, y = i * H / 4; mk(BOX(.04, 1.0, .04), steel, x, FLOOR_Y + y + .5, zs0 + .03, stG); }
+  mk(BOX(xb - xt, .02, 1.0), M(0xbfe6ff, { r: .1, t: .35 }), (xb + xt) / 2, FLOOR_Y + H / 2 + .5, zs0 + .03, stG, false).rotation.z = Math.atan2(H, xb - xt);
+  // döşeme (merdiven boşluğu hariç)
+  const deck = T("terDeck", 128, 128, (g, w, h) => { g.fillStyle = "#a67c52"; g.fillRect(0, 0, w, h); for (let i = 0; i < 8; i++){ g.fillStyle = i % 2 ? "#9a7049" : "#b0865b"; g.fillRect(0, i * 16, w, 15); g.fillStyle = "rgba(0,0,0,.12)"; g.fillRect(((i * 37) % 100), i * 16, 2, 15); } }, [6, 6]);
+  const dM = stdMap(deck, .8), slab = (x0, x1, z0, z1) => { const s = mk(BOX(x1 - x0, .25, z1 - z0), [M(0xd8cfc0), M(0xd8cfc0), dM, M(0xcfc6b6), M(0xd8cfc0), M(0xd8cfc0)], (x0 + x1) / 2, Y - .125, (z0 + z1) / 2, upG, false, true); return s; };
+  slab(-X - .12, X + .12, -5.12, zs0 - .1); slab(-X - .12, xt, zs0 - .1, Z + .12); slab(xb + .2, X + .12, zs0 - .1, Z + .12);
+  // korkuluk: cam paneller + ahşap küpeşte
+  const glass = M(0xcfeaff, { r: .1, t: .32 }), top = M(0x6b4a33, { r: .5 });
+  [[0, -5.12, 2 * X + .24, 0], [0, Z + .12, 2 * X + .24, 0], [-X - .12, (Z - 5) / 2, Z + 5.24, 1], [X + .12, (Z - 5) / 2, Z + 5.24, 1]].forEach(([x, z, len, side]) => {
+    const g1 = mk(side ? BOX(.05, .95, len) : BOX(len, .95, .05), glass, x, Y + .5, z, upG, false); const g2 = mk(side ? BOX(.1, .06, len) : BOX(len, .06, .1), top, x, Y + 1.0, z, upG); fadeable(g1); fadeable(g2); });
+  // boşluk korkuluğu (üstten merdivene düşülmesin)
+  mk(BOX(xb - xt + .2, .9, .05), glass, (xb + xt) / 2 + .1, Y + .45, zs0 - .1, upG, false); mk(BOX(.05, .9, zs1 - zs0 + .1), glass, xb + .2, Y + .45, zm, upG, false);
+  // masalar + şemsiyeler + saksılar + ışık zinciri
+  const cols = [-4.6, -.6, 3.4, 7.2], tts = [], umbC = [0xe8505b, 0x2a9d8f, 0xf4a261, 0x3d8bff];
+  let n = 0;
+  for (let z = -3.0; z < zs0 - 1.3; z += 2.6) cols.forEach((x, ci) => {
+    const t = makeTable("ttable" + (++n), x, z, Object.assign({}, th, { tstyle: "round" })); t.fl = 1; t.group.position.y = Y; upG.add(t.group); tts.push(t);
+    const ug = new THREE.Group(); ug.position.set(x, Y, z); upG.add(ug); mk(CYL(.03, .03, 2.3, 8), M(0xdddddd, { m: .6, r: .3 }), 0, 1.15, 0, ug);
+    mk(new THREE.ConeGeometry(1.25, .45, 10, 1), M(umbC[ci % 4], { r: .7 }), 0, 2.3, 0, ug, false); });
+  for (let x = -X + .6; x < X - .3; x += 2.2){ pot(x, -4.7, true, upG).position.y = Y; }
+  const wire = M(0x2b2f36), bulb = M(0xfff1c1, { e: 0xffd27a, ei: 1.2, r: .3 });
+  for (let x = -X + .5; x < X; x += .9) for (const z of [-4.9, Z - .1]) mk(SPH(.06, 8, 6), bulb, x, Y + 2.1 + Math.sin(x) * .08, z, upG, false);
+  { const tx = signTexture("TERAS", "#2a9d8f", "#ffffff", "#bff5ea"); const s = mk(BOX(2.4, .5, .1), [M(0x2b2f36), M(0x2b2f36), M(0x2b2f36), M(0x2b2f36), stdMap(tx, .6, { emissive: lin(0xffffff), emissiveMap: tx, emissiveIntensity: .5 }), M(0x2b2f36)], 0, Y + 1.5, Z + .2, upG); fadeable(s); }
+  upG.visible = false;
+  const stair = { h: H, xb, xt, zs0, zs1, zm, bot: new THREE.Vector3(xb + .55, FLOOR_Y, zm), top: new THREE.Vector3(xt - .45, Y, zm) };
+  // engeller: zemin (korkuluk + sahanlık altı) / üst kat (boşluk, masalar) / merdiven içi
+  const ground = [{ x0: -8.85, x1: xb - .6, z0: zs0 - .1, z1: zs0 + .04 }, { x0: -8.85, x1: xt, z0: zs0 - .1, z1: Z + .2 }];
+  const obst2 = [{ x0: xt + .45, x1: xb + .3, z0: zs0 - .2, z1: Z + .3 }].concat(tts.map(t => stationFootprint(t)));
+  const sObst = [{ x0: -8.85, x1: xb - .6, z0: zs0 - .1, z1: zs0 + .04 }];
+  return { upG, stG, stair, ground, obst2, sObst, tables: tts, bounds2: { x0: -X + .35, x1: X - .35, z0: -4.75, z1: Z - .4 } };
+}
+const inStair = p => { const S = V && V.stair; return !!S && p.x >= S.xt && p.x <= S.xb && p.z >= S.zs0 && p.z <= S.zs1 + .1; };
+const onUpper = p => !!(V && V.stair) && p.y > FLOOR_Y + V.stair.h / 2;
+/* merdivende yükseklik rampası; merdivenden çıkınca kata oturt */
+function stairY(pos){
+  const S = V && V.stair; if (!S) return;
+  if (inStair(pos)){ const t = clamp((S.xb - pos.x) / (S.xb - S.xt), 0, 1); pos.y = FLOOR_Y + t * S.h; }
+  else if (pos.y > FLOOR_Y + .01 && Math.abs(pos.y - (FLOOR_Y + S.h)) > .01) pos.y = FLOOR_Y + (pos.y > FLOOR_Y + S.h / 2 ? S.h : 0);
+}
+/* hangi kat görünüyor: 1. oyuncunun katı (ya da 🔼/🔽 düğmesi) */
+function terraceTick(){
+  const S = V && V.stair, btn = document.getElementById("terBtn");
+  if (!S || mode !== "game"){ if (btn) btn.style.display = "none"; viewFl = 0; return; }
+  const p0 = NET.role === "guest" ? (players[1] || players[0]) : players[0], pf = p0 && onUpper(p0.group.position) ? 1 : 0;
+  if (pf !== lastPf){ lastPf = pf; viewManual = null; }
+  viewFl = viewManual != null ? viewManual : pf;
+  V.upG.visible = viewFl === 1;
+  const vis = o => { const up = onUpper(o.group.position); o.group.visible = o.hiddenWC ? false : (viewFl === 1 || !up || inStair(o.group.position)); };
+  customers.forEach(c => { if (c.wcT == null) vis(c); }); staff.forEach(w => { if (w.state !== "away") vis(w); }); players.forEach(vis);
+  cam.target.y += ((viewFl ? S.h + .6 : .6) - cam.target.y) * .12;
+  let b = btn; if (!b){ b = document.createElement("button"); b.id = "terBtn"; b.onclick = () => { viewManual = viewFl ? 0 : 1; SND.play("step", .2); }; document.body.appendChild(b); }
+  b.style.display = "block"; const t = viewFl ? "🔽 Salonu göster" : "🔼 Terası göster"; if (b.textContent !== t) b.textContent = t;
 }
 
 /* =====================================================================
@@ -3620,6 +3766,8 @@ function homeScores(){
 const camera = new THREE.PerspectiveCamera(32, 1, .1, 240);
 const cam = { az: .62, polar: .92, r: 17, target: new THREE.Vector3(0, .6, .7), shake: 0 };
 let baseR = 17, camFollow = false;
+const camMaxR = () => Math.max(50, baseR * 1.45);   // büyük dükkânda daha uzağa çekilebilsin
+const camZR = () => V && V.bounds ? Math.max(3, (V.bounds.z1 - V.bounds.z0) / 2 - 2) : 3;
 const camBaseR = r => camera.aspect < 1 ? r / Math.max(.45, camera.aspect) * .62 + r * .35 : r;
 function focusCam(){
   if (!V) return;
@@ -3630,6 +3778,7 @@ function applyCamera(){
   const { az, polar, r, target } = cam;
   camera.position.set(target.x + r * Math.sin(polar) * Math.sin(az), target.y + r * Math.cos(polar), target.z + r * Math.sin(polar) * Math.cos(az));
   camera.lookAt(target);
+  if (scene.fog && scene.fog.isFog){ const n = r * .9, f = r * 2.3 + 25; if (scene.fog.near < n) scene.fog.near = n; if (scene.fog.far < f) scene.fog.far = f; if (camera.far < f + 40){ camera.far = f + 40; camera.updateProjectionMatrix(); } }
   if (cam.shake > 0){
     cam.shake = Math.max(0, cam.shake - .016);
     camera.position.x += (Math.random() - .5) * cam.shake * .6; camera.position.y += (Math.random() - .5) * cam.shake * .4;
@@ -3647,7 +3796,7 @@ function resize(){
   renderer.setSize(w, h);
   camera.aspect = w / h;
   if (V) baseR = camBaseR(V.cam.r);
-  cam.r = clamp(cam.r, 7, 50);
+  cam.r = clamp(cam.r, 7, camMaxR());
   camera.updateProjectionMatrix();
   casCamera.aspect = w / h; casCamera.updateProjectionMatrix(); frameCas();
 }
@@ -3994,6 +4143,7 @@ function walkTo(o, target, dt, speed = 2.2){
   const d = _d.length();
   if (d <= .04) return true;
   pos.addScaledVector(_d.normalize(), Math.min(d, speed * dt));
+  if (V && V.stair) stairY(pos);
   const tr = Math.atan2(_d.x, _d.z);
   let df = tr - o.group.rotation.y; df = Math.atan2(Math.sin(df), Math.cos(df));
   o.group.rotation.y += df * Math.min(1, dt * 10);
@@ -4010,6 +4160,8 @@ function lieDown(s, on){
   s.root.rotation.x = on ? -Math.PI / 2 : 0;
 }
 function leavePath(from, t){
+  if (t && t.fl && V.stair){ const S = V.stair, Y = FLOOR_Y + S.h, ax = t.seat.x - .45, D = V.exit[0].x, fz = (V.frontZ || 6.4) - .85;   // teras: merdivenden in
+    return [new THREE.Vector3(ax, Y, t.seat.z + .55), new THREE.Vector3(ax, Y, S.top.z - 1.1), new THREE.Vector3(S.top.x, Y, S.top.z - 1.1), S.top.clone(), S.bot.clone(), new THREE.Vector3(S.bot.x + .4, .03, fz), new THREE.Vector3(D, .03, fz)].concat(V.exit.slice(1).map(v => v.clone())); }
   // masadan kalkan müşteri masaların arasındaki koridordan, ön cam boyunca kapıya yürür (masaların içinden geçmez)
   if (t && V.kind === "shop" && V.exit.length >= 3){
     const ax = t.seat.x - .45, D = V.exit[0].x;
@@ -4023,6 +4175,9 @@ function startLeaving(c){
   const t = c.table;
   if (c.table){ c.table.cust = null; c.table = null; }
   c.path = leavePath(c.group.position, t);
+  // bazı müşteriler çıkmadan önce tuvalete uğrar
+  if (t && !t.fl && V && V.wc && game.wc && !c.angry && c.path.length >= 3 && Math.random() < .3){
+    const W = V.wc; c.afterWC = [W.door.clone()].concat(c.path.slice(2)); c.path = c.path.slice(0, 2).concat([W.door.clone(), W.inside.clone()]); }
 }
 function updateCustomers(dt){
   const queue = queueList();
@@ -4040,19 +4195,22 @@ function updateCustomers(dt){
       if (!walkTo(c, V.waitSpot(waiting.indexOf(c)), dt)) spd = 2.2; else turnTo(c, Math.PI, dt);
     } else if (c.state === "toTable"){
       c.state = "seated";
-      c.group.position.set(c.table.seat.x, FLOOR_Y, c.table.seat.z);
+      c.group.position.set(c.table.seat.x, FLOOR_Y + (c.table.fl ? TER_H : 0), c.table.seat.z);
       c.group.rotation.y = c.table.seat.rot;
     } else if (c.state === "eating"){
       c.eatT -= dt;
       if (c.eatT <= 0){
         const t = c.table;
         t.dirty = true; t.dirtyG.visible = true; t.foodG.clear(); t.foodItems = null;
-        c.group.position.set(t.seat.x - .3, FLOOR_Y, t.seat.z + .6);
+        c.group.position.set(t.seat.x - .3, FLOOR_Y + (t.fl ? TER_H : 0), t.seat.z + .6);
         startLeaving(c);
         SND.voice(c.fem, "happy", 2, c.pitch);
       }
     } else if (c.state === "leaving"){
-      c.remove = true;
+      if (c.afterWC){
+        if (c.wcT == null){ c.wcT = 2.2 + Math.random() * 1.5; c.group.visible = false; if (game.wc){ if (game.wc.dirt >= 3) addRating(2); game.wc.dirt += .75; } }
+        c.wcT -= dt; if (c.wcT <= 0){ c.group.visible = true; c.path = c.afterWC; c.afterWC = null; c.wcT = null; }
+      } else c.remove = true;
     }
     if (c.order || c.state === "queue" || c.state === "waiting"){ const r = c.patience / c.maxP; c.sim.expr = c.state === "eating" ? 1 : r < .25 ? -.8 : r < .5 ? 0 : .7; }
     if (c.state === "leaving") c.sim.expr = c.angry ? -.9 : 1;
@@ -4097,7 +4255,7 @@ function drawCustLabel(c, y){
     c.lbl.innerHTML = `${c.lifeId ? `<span class="badge">💛</span>` : KIND_BADGE[c.kind] ? `<span class="badge">${KIND_BADGE[c.kind]}</span>` : ""}${orderIcons(c)}<div class="pb"><div class="pf" style="width:${r * 100}%;background:${col}"></div></div>`;
   }
   const pos = c.group.position;
-  place(c.lbl, pos.x, y, pos.z);
+  place(c.lbl, pos.x, y + pos.y - FLOOR_Y, pos.z);
 }
 function leaveAngry(c){
   const pos = c.group.position; c.angry = true;
@@ -4483,7 +4641,9 @@ function stars(){ return save.ratings.length ? save.ratings.reduce((a, b) => a +
 function nearestStation(p){
   let best = null, bd = 1e9;
   const pos = p.group.position, ry = p.group.rotation.y, fx = Math.sin(ry), fz = Math.cos(ry);
+  const pf = V && V.stair && onUpper(pos) ? 1 : 0;
   for (const s of stations){
+    if ((s.fl || 0) !== pf) continue;
     const dx = s.x - pos.x, dz = s.z - pos.z, d = Math.hypot(dx, dz);
     if (d > (s.range || CFG.interactRange)) continue;
     const facing = d > .01 ? (dx * fx + dz * fz) / d : 1;
@@ -4662,6 +4822,11 @@ function interact(p){
       return;
     }
     case "coffee": drinkCoffee(p); return;
+    case "wc": {
+      if (!game.wc || game.wc.dirt < .5){ say(p, "🚻 Tuvalet tertemiz ✨"); return; }
+      p.lockT = 1.4; game.wc.dirt = 0; say(p, "🧽 Tuvaleti temizledin ✨"); SND.play("ding"); addRating(5);
+      return;
+    }
     case "office": openOffice(p); return;
     case "pack": {
       const open = game.phone.filter(o => !o.ready && !o.done);
@@ -4687,7 +4852,9 @@ function takeOrder(p, c){
     const t = free[ri(free.length)];
     t.cust = c; c.table = t; c.state = "toTable";
     const ax = t.seat.x - .45;
-    c.path = [new THREE.Vector3(ax, .03, .55), new THREE.Vector3(ax, .03, t.seat.z), new THREE.Vector3(t.seat.x, .03, t.seat.z)];
+    if (t.fl && V.stair){ const S = V.stair, Y = FLOOR_Y + S.h;   // teras masası: merdivenden çık
+      c.path = [new THREE.Vector3(S.bot.x + .4, .03, c.group.position.z), S.bot.clone(), S.top.clone(), new THREE.Vector3(S.top.x, Y, S.top.z - 1.1), new THREE.Vector3(ax, Y, S.top.z - 1.1), new THREE.Vector3(ax, Y, t.seat.z), new THREE.Vector3(t.seat.x, Y, t.seat.z)]; }
+    else c.path = [new THREE.Vector3(ax, .03, .55), new THREE.Vector3(ax, .03, t.seat.z), new THREE.Vector3(t.seat.x, .03, t.seat.z)];
   } else {
     c.state = "waiting";
     if (dineIn && F.tables) flash("🍽️ Boş ve temiz masa yok, müşteri ayakta bekliyor", "#f0a42a");
@@ -5444,7 +5611,8 @@ function updateEdit(dt){
   }
 }
 function furnAt(x, z){
-  return save.home.furniture.filter(onFloor).reverse().find(f => { const b = furnBox(f, .1); return x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1; });
+  const hit = save.home.furniture.filter(onFloor).reverse().filter(f => { const b = furnBox(f, .1); return x > b.x0 && x < b.x1 && z > b.z0 && z < b.z1; });
+  return hit.find(f => !(FURN[f.id] && FURN[f.id].walk)) || hit[0];   // halı gibi üstüne basılanlar en son: üstteki eşya seçilsin
 }
 function editAct(){
   if (!edit.on) return;
@@ -5497,7 +5665,7 @@ function renderEditBar(){
   const el = document.getElementById("editBar");
   if (!edit.on){ el.style.display = "none"; return; }
   el.style.display = "flex";
-  el.innerHTML = `<span>🛠 ${edit.hold ? "Taşınıyor: " + FURN[edit.hold.id].name : "Bir eşyanın üstüne gel ve al"} · ${isTouch ? "joystick / dokun: imleç" : "yürü tuşları: imleç · E: al/bırak · Q: döndür · X: sat"}</span>
+  el.innerHTML = `<span>🛠 ${edit.hold ? "Taşınıyor: <b>" + FURN[edit.hold.id].name + "</b> · istediğin yere sürükle ya da dokun" : "Eşyayı parmağınla / fareyle <b>sürükleyip bırak</b>"}${isTouch ? "" : " · E: al/bırak · Q: döndür · X: sat"}</span>
     <button class="sec" id="eRot" ${edit.hold ? "" : "disabled"}>↻ Döndür</button>
     <button class="sec" id="eSell">💰 Sat</button>
     <button id="eDone">✓ Bitti</button>`;
@@ -5573,21 +5741,36 @@ function tapFloor(clientX, clientY){
   if (raycaster.ray.intersectPlane(floorPlane, hit)){ edit.cursor.set(hit.x, 0, hit.z); updateEdit(0); editAct(); }
 }
 
+/* ev düzenleme: eşyayı parmakla/fareyle sürükle-bırak (dokun-al / dokun-bırak da çalışır) */
+function editPtr(type, cx, cy){
+  if (!(mode === "home" && edit.on)) return false;
+  if (type === "down"){
+    const h = floorHitAt(cx, cy); if (!h) return false;
+    if (edit.hold){ edit.drag = { x: cx, y: cy, moved: false, held: true }; edit.cursor.set(h.x, 0, h.z); updateEdit(0); return true; }
+    if (furnAt(snapC(h.x), snapC(h.z))){ edit.cursor.set(h.x, 0, h.z); editAct(); if (edit.hold){ edit.drag = { x: cx, y: cy, moved: false, held: false }; return true; } }
+    return false;
+  }
+  if (type === "move"){ const d = edit.drag; if (!d) return false; if (Math.hypot(cx - d.x, cy - d.y) > 7) d.moved = true; const h = floorHitAt(cx, cy); if (h){ edit.cursor.set(h.x, 0, h.z); updateEdit(0); } return true; }
+  if (type === "up"){ const d = edit.drag; if (!d) return false; edit.drag = null; if (d.moved || d.held) editAct(); renderEditBar(); return true; }
+  return false;
+}
 /* =====================================================================
    GÜNCELLEME
    ===================================================================== */
 const _tp = new THREE.Vector3();
 function collide(pos){
   const r = V && V.kind === "home" ? .24 : .28;
-  for (const b of V.obst){
+  const st = V && V.stair && inStair(pos), up = !st && V && V.stair && onUpper(pos);
+  for (const b of (st ? V.sObst : up ? V.obst2 : V.obst)){
     if (pos.x > b.x0 - r && pos.x < b.x1 + r && pos.z > b.z0 - r && pos.z < b.z1 + r){
       const dl = pos.x - (b.x0 - r), dr = (b.x1 + r) - pos.x, du = pos.z - (b.z0 - r), dd = (b.z1 + r) - pos.z;
       const m = Math.min(dl, dr, du, dd);
       if (m === dl) pos.x = b.x0 - r; else if (m === dr) pos.x = b.x1 + r; else if (m === du) pos.z = b.z0 - r; else pos.z = b.z1 + r;
     }
   }
-  const B = V.bounds;
+  const B = up ? V.bounds2 : V.bounds;
   pos.x = clamp(pos.x, B.x0, B.x1); pos.z = clamp(pos.z, B.z0, B.z1);
+  if (V && V.stair) stairY(pos);
 }
 const GRAD = { g: "linear-gradient(90deg,#43c06a,#9be36b)", a: "linear-gradient(90deg,#f0a42a,#f7d35a)", r: "linear-gradient(90deg,#e2434b,#f2797e)", b: "linear-gradient(90deg,#3d8bff,#7fb4ff)" };
 function updatePlayers(dt){
@@ -5626,7 +5809,7 @@ function updatePlayers(dt){
         let best = null, bd = Math.hypot(pos.x - sx, pos.z - sz);
         for (const a of [.55, -.55, 1.05, -1.05, 1.45, -1.45]){
           const c = Math.cos(a), si = Math.sin(a), ax = vx * c - vz * si, az = vx * si + vz * c;
-          _tp.set(sx + ax * speed * dt, 0, sz); collide(_tp); _tp.z += az * speed * dt; collide(_tp);
+          _tp.set(sx + ax * speed * dt, pos.y, sz); collide(_tp); _tp.z += az * speed * dt; collide(_tp);
           const d = Math.hypot(_tp.x - sx, _tp.z - sz);
           // ileri yönde ilerleme şartı (geri kaçmasın)
           if (d > bd + 1e-4 && ((_tp.x - sx) * vx + (_tp.z - sz) * vz) > 0){ bd = d; best = [_tp.x, _tp.z]; }
@@ -5816,6 +5999,7 @@ function tick(dt, draw){
         if (game.time <= 0) endShift();
       }
       if (!(game.running && game.paused)){ updateCustomers(dt); updateCars(dt); updateStaff(dt); }
+      terraceTick();
     } else if (mode === "out"){
       updateOuting(dt);
     } else if (mode === "home"){
@@ -5825,7 +6009,7 @@ function tick(dt, draw){
       }
       updateHomeSpots(); updateHomeHud();
     } else {
-      cam.az += dt * .05;
+      if (!officeEd.on) cam.az += dt * .05;
       players.forEach(p => animSim(p.sim, dt, 0, p.hand.length > 0));
       updateCustomers(dt);
     }
@@ -5833,7 +6017,7 @@ function tick(dt, draw){
     updateTension(dt);
     if (camFollow && (mode === "game" || mode === "home") && players.length && V && V.cam){   // dikey telefonda kamera oyuncuyu izler
       let x = 0, z = 0; players.forEach(p => { x += p.group.position.x; z += p.group.position.z; }); x /= players.length; z /= players.length;
-      const tx = V.cam.x + clamp(x - V.cam.x, -4.5, 4.5) * .8, tz = V.cam.z + clamp(z - V.cam.z, -3, 3) * .45, k = Math.min(1, dt * 3);
+      const tx = V.cam.x + clamp(x - V.cam.x, -4.5, 4.5) * .8, tz = V.cam.z + clamp(z - V.cam.z, -camZR(), camZR()) * .45, k = Math.min(1, dt * 3);
       cam.target.x = lerp(cam.target.x, tx, k); cam.target.z = lerp(cam.target.z, tz, k);
     }
     applyCamera();
@@ -5893,7 +6077,7 @@ document.getElementById("gamePhone").onclick = () => {
 function leaveShiftToTeam(then){
   const crew = staffTotal(), left = Math.max(0, game.time), el = Math.max(20, game.d.shift - left);
   // dükkân sen çıkınca durmaz: kalan süre boyunca tahmini gelir (gözlenen hız ya da son vardiyaların ortalaması, hangisi yüksekse)
-  const rate = Math.max(game.money / el, avgRev() / Math.max(60, game.d.shift) * .9, LV().pm * .2), eff = crew ? Math.min(1, .45 + crew * .1) : .2, est = Math.round(rate * left * eff);
+  const rate = Math.max(game.money / el, avgRev() / Math.max(60, game.d.shift) * .9, LV().pm * .2), eff = crew ? Math.min(1, .45 + crew * .1) : .2, est = Math.max(0, Math.round(rate * left * eff)) || 0;
   modal(`<h2>🚶 Dükkânı ekibe bırak</h2><p>${crew ? `${crew} kişilik ekibin kalan ${Math.ceil(left / 60)} dakikayı senin yerine çalışır. Tahmini ek kazanç: <b>$${fmt(est)}</b> (ekibin verimi %${Math.round(eff * 100)}).` : `Personelin yok ama dükkân açık kalır: tezgâhtaki hazır ürünler ve tanıdık müşterilerle kalan ${Math.ceil(left / 60)} dakikada tahmini <b>$${fmt(est)}</b> kazanç gelir (verim %20). Personel tutarsan çok daha fazla kazanırsın.`}</p><p class="small">⏱️ Vardiya sen çıkınca durmaz; süre sonuna kadar dükkân çalışır, kazanç kasana eklenir.</p>
     <div class="btns"><button class="sec" id="ltNo">← Vardiyaya dön</button><button id="ltGo">✔ Bırak ve çık</button></div>`);
   on("ltNo", () => { closeOverlay(); game.paused = false; game.phonePause = false; });
@@ -5976,8 +6160,8 @@ function showMenu(){
   on("bSet", () => showSettings());
   on("bWheel", () => showWheel(showMenu));
   on("bShop", () => showDiamondShop(showMenu));
-  on("bStory", () => { useSlot("story", "story"); if (save.shifts > 0 || save.level > 1) beginGame(1); else { save.rel = "single"; save.life = newLife("single"); writeSave(); openCas(1); } });
-  on("bStoryCas", () => { useSlot("story", "story"); openCas(1); });
+  on("bStory", () => { useSlot("story", "story"); storyMigrate(); if (save.shifts > 0 || save.level > 1) beginGame(1); else { save.rel = "single"; save.life = newLife("single"); writeSave(); openCas(1); } });
+  on("bStoryCas", () => { useSlot("story", "story"); storyMigrate(); openCas(1); });
   on("bDuo", showDuoList);
   on("bNetGo", () => beginGame(2));
   on("bNet", () => { if (NET.role === "host"){ NET.close(); showMenu(); } else showNetMenu(); });
@@ -6015,7 +6199,7 @@ function showBackup(back){
     <input type="file" id="bkFile" accept=".json,.txt,application/json">
     <textarea id="bkText" rows="3" placeholder="Yedek kodunu buraya yapıştır" style="width:100%;margin-top:6px"></textarea>
     <div class="btns"><button class="sec" id="bkBack">← Geri</button><button id="bkLoad">Geri yükle</button></div><p class="diag" id="bkMsg"></p>`);
-  on("bkBack", back);
+  on("bkBack", () => (back || closeOverlay)());
   on("bkDl", () => { try { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([code], { type: "application/json" })); a.download = "couples-burger-life-yedek-" + new Date().toISOString().slice(0, 10) + ".json"; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); flash("💾 Yedek indirildi", "#43c06a"); } catch(e){ flash("İndirme açılamadı, kodu kopyala", "#e9555b"); } });
   on("bkCopy", () => { const done = () => flash("📋 Yedek kodu kopyalandı", "#43c06a"); try { navigator.clipboard.writeText(code).then(done, () => { document.getElementById("bkText").value = code; flash("Kodu kutudan seçip kopyala", "#f0a42a"); }); } catch(e){ document.getElementById("bkText").value = code; } });
   const file = document.getElementById("bkFile");
@@ -6050,7 +6234,7 @@ function showSettings(back = showMenu){
   on("sBak", () => showBackup(() => showSettings(back)));
   on("sPrev", showPreviewMenu);
   on("sTest", () => testLogin(() => showSettings(back)));
-  on("sBack", () => back());
+  on("sBack", () => (back || closeOverlay)());
   on("sReset", () => {
     modal(`<h2>Kaydı sıfırla?</h2><p>Tüm ilerleme, evin, mobilyaların ve karakterlerin silinir. Bu geri alınamaz.</p>
       <div class="btns"><button class="sec" id="rNo">Vazgeç</button><button class="danger" id="rYes">Evet, sıfırla</button></div>`);
@@ -6365,7 +6549,7 @@ function renderHomeBar(){
   const alert = save.chars.some(c => (c.streak || 0) >= 4) || !save.seenCity || prefs.wheelDay !== todayKey();
   document.getElementById("homeBar").innerHTML = `
     <button class="sec phone-btn ${alert ? "new" : ""}" id="hbPhone">📱 Telefon${(() => { const n = unreadTotal() + (save.life2 && twoLives() ? Object.values(save.life2.unread || {}).reduce((a, b) => a + b, 0) : 0); return n ? ` <b class="cnt">${n}</b>` : ""; })()}</button>
-    ${isCouple() ? `<button class="sec" id="hbGest">💐 Jest</button>` : ""}${isCouple() || (save.kids || []).length ? `<button class="sec" id="hbFam">👶 Aile</button>` : ""}
+    ${isCouple() ? `<button class="sec" id="hbGest">💐 Jest</button>` : ""}${isCouple() || (save.kids || []).length || lvKey() >= 14 ? `<button class="sec" id="hbFam">👶 Aile</button>` : ""}
     <button class="sec" id="hbShop">🛒 Mağaza</button>
     <button class="sec" id="hbEdit">🛠 Düzenle</button>
     <button class="sec" id="hbMenu">☰</button>
@@ -6490,6 +6674,13 @@ function calcRecipe(r){
 }
 function defaultRecipe(name){ return calcRecipe({ name: (name || "Şef") + " Special", bun: 1, patty: 0, cheeseKind: 1, sauceKind: 0, extras: [1], price: 12 }); }
 let draftRecipe = null;
+const terracePrice = () => Math.round(28000 * Math.max(1, LV().pm / 5));
+function terraceCard(){
+  const L = save.level, v = L >= 5 ? venueNo() : 0, ok = terraceOK(), has = hasTerrace(), pr = terracePrice();
+  const why = L < 5 || v < 8 ? "Lv8 mekândan itibaren açılır" : !ok ? "Bu mekânın binası kat çıkmaya uygun değil (bir sonraki mekânda olabilir)" : "";
+  return `<div class="card ${has ? "on" : ""} ${why ? "lock" : ""}"><div class="ic">🏙️</div><b>Teras katı (üst kat)</b><small>Alt katla aynı boyutta açık hava terası: +${has ? "" : "~"}12 masa, şemsiyeler, ışık zinciri. Merdivenden sen, garsonlar ve müşteriler çıkar. Terasa müşteri daha çok gelir.${why ? " · " + why : ""}</small>
+    <div class="pr">${has ? "✓ Var" : why ? "Kilitli" : "$" + fmt(pr)}</div><button id="terBuy" ${has || why || save.money < pr ? "disabled" : ""}>${has ? "Teras açık" : why ? "Kilitli" : save.money < pr ? "Para yetmiyor" : "🏗️ Üst katı yap"}</button></div>`;
+}
 function showManage(tab, back){
   const L = save.level;
   const tabs = `<div class="tabs"><button class="${tab === "up" ? "on" : ""}" id="mU">⚙️ Yükseltmeler</button>
@@ -6510,7 +6701,8 @@ function showManage(tab, back){
         <button data-exp="${k}" data-p="${pr}" ${lv >= max || lock || save.money < pr ? "disabled" : ""}>${lv >= max ? "En büyük" : lock ? "Kilitli" : save.money < pr ? "Para yetmiyor" : "🏗️ Genişlet"}</button></div>`; };
     body = `<p>Dükkânını büyüt: değişiklikler bir sonraki vardiyada görünür. Daha büyük salon = daha çok masa ve müşteri.</p><div class="cards">
       ${opt("salon", "Salonu büyüt", "📐", `Ön cephe 2,6 m ileri alınır, yeni bir sıra masa gelir (+3 masa).${L >= 5 ? " <b>Lv5+: sınırsız</b>." : " Lv5'te sınırsız olur."}`, L >= 5 ? 99 : 2, Array.from({ length: 100 }, (_, i) => Math.round(2500 * Math.pow(i < 2 ? 3.2 : 1.9, i))))}
-      ${opt("tables", "Masa ekle", "🍽️", L >= 3 ? "Bu mekânda yan sütunlar dolu: masalar salonu büyüttükçe sınırsız artar." : "Sağ tarafa yeni masa (her alım +1 masa).", L >= 3 ? 0 : 2, [450, 700])}
+      ${L >= 3 ? opt("tablesX", "Masa ekle", "🍽️", `Her alım <b>+1 masa</b> (her 3 masada salon öne doğru bir sıra uzar). Salonu büyütmekten ucuz.${L >= 5 ? " <b>Lv5+: sınırsız</b>." : " Lv5'te sınırsız olur."}`, L >= 5 ? 99 : 6, Array.from({ length: 100 }, (_, i) => Math.round(700 * Math.pow(1.32, i)))) : opt("tables", "Masa ekle", "🍽️", "Sağ tarafa yeni masa (her alım +1 masa).", 2, [450, 700])}
+      ${terraceCard()}
       ${opt("office", "Ofisi büyüt", "🗂️", "Ofis odası genişler: daha ferah, eşyalar yayılır.", 3, [1200, 3500, 9000])}
       ${opt("kitchen", "Mutfağı büyüt", "🍳", "1: ikinci ızgara · 2: ikinci fritöz (gözler/sepetler yükseltmelerle artar).", 2, [1800, 6000])}</div>`;
   } else if (tab === "staff"){
@@ -6534,11 +6726,12 @@ function showManage(tab, back){
   }
   modal(`<h2>🏪 Restoran yönetimi <span class="money">💵 $${fmt(save.money)}</span></h2>${tabs}${body}<div class="btns"><button class="sec" id="mBack">← Geri</button></div>`, true);
   on("mU", () => showManage("up", back)); on("mS", () => showManage("staff", back)); on("mL", () => showManage("lab", back)); on("mA", () => showManage("ads", back)); on("mO", () => showOfficeDesign(() => showManage("staff", back))); on("mD", () => showRestDesign(() => showManage("up", back))); on("mX", () => showManage("exp", back));
+  on("terBuy", () => { const pr = terracePrice(); if (save.money < pr || !terraceOK()) return; save.money -= pr; (save.terr = save.terr || {})[venueNo()] = 1; SND.play("levelup"); flash("🏙️ Teras katı yapıldı: sonraki vardiyada açılıyor · garsonlar ve müşteriler merdivenden çıkar", "#43c06a"); writeSave(); showManage("exp", back); });
   overlay.querySelectorAll("[data-exp]").forEach(b => b.onclick = () => { const p = +b.dataset.p, k = b.dataset.exp; if (save.money < p) return; save.money -= p; save.expand = save.expand || {}; save.expand[k] = (save.expand[k] || 0) + 1; SND.play("levelup"); flash("🏗️ Genişletme tamam: sonraki vardiyada hazır", "#43c06a"); writeSave(); showManage("exp", back); });
   overlay.querySelectorAll("[data-hire]").forEach(b => b.onclick = () => { hireStaff(b.dataset.hire); showManage("staff", back); });
   overlay.querySelectorAll("[data-fire]").forEach(b => b.onclick = () => { fireStaff(b.dataset.fire); showManage("staff", back); });
   on("adBuy", () => { buyAd(false); }); on("adDia", () => { buyAd(true); }); on("adWeb", () => { buyWebAd(); showManage("ads", back); });
-  on("mBack", () => { draftRecipe = null; back(); });
+  on("mBack", () => { draftRecipe = null; (back || closeOverlay)(); });
   overlay.querySelectorAll("[data-up]").forEach(b => b.onclick = () => { const p = +b.dataset.p; if (save.money < p) return; save.money -= p; const id = b.dataset.up; save.upLv = save.upLv || {}; save.upLv[id] = Math.min(upMax(id), upRaw(id) + 1); save.upgrades[id] = true; SND.play("buy"); writeSave(); showManage("up", back); });
   if (tab === "lab"){
     const r = draftRecipe;
@@ -6610,7 +6803,7 @@ function showMap(back){
     <p>Şube açın, yönetici atayın: her iş günü sonunda (vardiya bitince) yöneticili şubeler otomatik kazandırır. Şubeyi büyüttükçe günlük getirisi artar. Bir sonraki vardiyanın şehrini buradan seçin.</p>
     <div class="cards">${cards}</div><h3>📅 Bu haftanın sezon görevleri</h3><div class="cards">${qs}</div>
     <div class="btns"><button class="sec" id="mpBack">← Geri</button></div>`, true);
-  on("mpBack", back);
+  on("mpBack", () => (back || closeOverlay)());
   overlay.querySelectorAll("[data-buyc]").forEach(b => b.onclick = () => { const k = b.dataset.buyc; if (save.money < CITIES[k].price) return; save.money -= CITIES[k].price; save.branches[k] = { owned: true, manager: false, last: Date.now(), paid: CITIES[k].price, lvl: 1 }; SND.play("levelup"); writeSave(); showMap(back); });
   overlay.querySelectorAll("[data-work]").forEach(b => b.onclick = () => { save.city = b.dataset.work; writeSave(); SND.play("banner"); flash(`${CITIES[save.city].flag} Sonraki vardiya: ${CITIES[save.city].name}`, "#3d8bff"); showMap(back); });
   overlay.querySelectorAll("[data-man]").forEach(b => b.onclick = () => { const k = b.dataset.man, c = managerPrice(k); if (save.money < c) return; save.money -= c; save.branches[k].manager = true; save.branches[k].last = Date.now(); SND.play("buy"); writeSave(); showMap(back); });
@@ -6708,7 +6901,7 @@ function pollPads(dt){
     if (mode === "game" || mode === "home"){
       cam.az -= ax(2) * dt * 2.2;
       cam.polar = clamp(cam.polar + ax(3) * dt * 1.2, .55, 1.25);
-      if (pr(6)) cam.r = Math.min(50, cam.r + dt * 10);
+      if (pr(6)) cam.r = Math.min(camMaxR(), cam.r + dt * 10);
       if (pr(7)) cam.r = Math.max(7, cam.r - dt * 10);
     }
     padPrev[gp.index] = gp.buttons.map(b => b.pressed);
@@ -6766,8 +6959,8 @@ function showEnergy(back = closeOverlay){
       <button class="sec" id="enShop">💎 Elmas al (${isTest() ? "∞" : prefs.diamonds} var)</button>
     </div>
     <div class="btns"><button class="sec" id="enBack">← Geri</button></div>`);
-  on("enBack", back);
-  on("enDia", () => { if (!spendDiamonds(4)) return; refillEnergy(100, true); SND.play("levelup"); flash("⚡ Enerji doldu, yorgunluk sıfırlandı!", "#43c06a"); back(); });
+  on("enBack", () => (back || closeOverlay)());
+  on("enDia", () => { if (!spendDiamonds(4)) return; refillEnergy(100, true); SND.play("levelup"); flash("⚡ Enerji doldu, yorgunluk sıfırlandı!", "#43c06a"); (back || closeOverlay)(); });
   on("enAd", () => playAd(() => { prefs.adCount++; writePrefs(); refillEnergy(35, false); flash("⚡ +35 enerji", "#43c06a"); showEnergy(back); }));
   on("enShop", () => showDiamondShop(() => showEnergy(back)));
 }
@@ -6795,7 +6988,7 @@ function showDiamondShop(back = showMenu){
       <button class="sec" id="dsWheel">🎡 Günlük çark</button></div>
     <p class="small">Elmas kazanmanın yolları: günlük çark, ödül töreni (1./2./3.), seviye atlama, gurmeyi memnun etmek.</p>
     <div class="btns"><button class="sec" id="dsBack">← Geri</button></div>`, true);
-  on("dsBack", back);
+  on("dsBack", () => (back || closeOverlay)());
   on("dsCash", () => { if (!spendDiamonds(10)) return; save.money += convert; writeSave(); SND.play("coins"); flash(`💰 +$${fmt(convert)}`, "#43c06a"); showDiamondShop(back); });
   on("dsEn", () => showEnergy(() => showDiamondShop(back)));
   on("dsWheel", () => showWheel(() => showDiamondShop(back)));
@@ -6823,7 +7016,7 @@ function showWheel(back = showMenu){
     <div class="wheel"><div class="wheel-ptr">▼</div><svg id="whl" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#7a4a26"/>${segs}<circle cx="50" cy="50" r="7" fill="#FFF5E3" stroke="#7a4a26" stroke-width="2"/></svg></div>
     <p id="whRes" class="wheel-res">&nbsp;</p>
     <div class="btns"><button class="sec" id="whBack">← Geri</button><button id="whGo" ${can ? "" : "disabled"}>🎡 Çevir</button></div>`);
-  on("whBack", back);
+  on("whBack", () => (back || closeOverlay)());
   on("whGo", () => {
     if (!isTest()){ if (prefs.wheelDay === todayKey()) return; prefs.wheelDay = todayKey(); writePrefs(); }
     let r = Math.random() * WHEEL_W.reduce((a, b) => a + b, 0), k = 0; while ((r -= WHEEL_W[k]) > 0) k++;
@@ -6850,11 +7043,12 @@ const STAFF_DEF = {
   garson:  { ic: "🍽️", n: "Garson", minL: 1, hire: 60, base: 8, share: .045, color: 0xe8505b, desc: "Tezgâhlardaki hazır ürünleri masalara, pakete ve drive-thru'ya taşır; içecekleri dolaptan getirir." },
   asci:    { ic: "👨‍🍳", n: "Aşçı", minL: 1, hire: 80, base: 10, share: .055, color: 0xffffff, desc: "Izgarayı ve fritözü kullanır, burgeri hazırlar (peynir/sos dahil), ürünleri tezgâha bırakır. Otomatik makineleri de kullanır." },
   kurye:   { ic: "🛵", n: "Moto kurye", minL: 2, hire: 50, base: 7, share: .03, color: 0xf5b335, desc: "Paket rafındaki hazır telefon siparişlerini motoruyla adrese götürür." },
-  cagri:   { ic: "🎧", n: "Çağrı merkezi", minL: 2, hire: 40, base: 6, share: .025, color: 0x9a63e0, req: "kurye", desc: "Telefon siparişi toplar: vardiya boyunca ek sipariş gelir. Siparişleri hazırlayıp 🛵 paket rafına koyarsınız." }
+  cagri:   { ic: "🎧", n: "Çağrı merkezi", minL: 2, hire: 40, base: 6, share: .025, color: 0x9a63e0, req: "kurye", desc: "Kendi odasında (çağrı merkezi) telefon siparişi toplar: vardiya boyunca ek sipariş gelir. Siparişleri hazırlayıp 🛵 paket rafına koyarsınız." },
+  temizlik:{ ic: "🧹", n: "Temizlikçi", minL: 2, hire: 30, base: 5, share: .015, color: 0x2fb5c9, desc: "🚻 Tuvaleti temiz tutar (kirli tuvalet puanı düşürür), boşta kalınca kirli masaları siler." }
 };
-const STAFF_NAMES = { kasiyer: ["Zeynep", "Selin"], komi: ["Murat", "Emre", "Can"], garson: ["Ece", "Burak", "Melis", "Okan"], asci: ["Hasan Usta", "Gül Usta", "Tarık", "Nazlı"], kurye: ["Kaan", "Berk", "Umut"], cagri: ["Derya", "İrem"] };
+const STAFF_NAMES = { kasiyer: ["Zeynep", "Selin"], komi: ["Murat", "Emre", "Can"], garson: ["Ece", "Burak", "Melis", "Okan"], asci: ["Hasan Usta", "Gül Usta", "Tarık", "Nazlı"], kurye: ["Kaan", "Berk", "Umut"], cagri: ["Derya", "İrem"], temizlik: ["Sena", "Onur"] };
 /* aynı görevden birden fazla kişi: seviye büyüdükçe kadro büyür */
-const STAFF_MAX = { kasiyer: [0, 1, 1, 2, 1, 2], komi: [0, 0, 2, 2, 3, 3], garson: [0, 1, 2, 3, 3, 4], asci: [0, 1, 2, 3, 3, 4], kurye: [0, 0, 1, 2, 2, 3], cagri: [0, 0, 1, 1, 2, 2] };
+const STAFF_MAX = { kasiyer: [0, 1, 1, 2, 1, 2], komi: [0, 0, 2, 2, 3, 3], garson: [0, 1, 2, 3, 3, 4], asci: [0, 1, 2, 3, 3, 4], kurye: [0, 0, 1, 2, 2, 3], cagri: [0, 0, 1, 1, 2, 2], temizlik: [0, 0, 1, 1, 1, 2] };
 const staffCount = k => { const v = save.staff && save.staff[k]; return typeof v === "number" ? v : v ? 1 : 0; };
 /* kadro sınırsız; önerilen kadro (STAFF_MAX) aşılırsa fazlası maaş alır ama dükkâna katkısı çok az olur → zarar */
 const staffRecK = k => STAFF_MAX[k][Math.min(5, save.level)] + (save.level >= 5 && !WORK ? Math.floor((venueNo() - 5) / 5) : 0);
@@ -6909,14 +7103,15 @@ const STAFF_LOOK = {
   garson:  { body: "f", skin: 2, hairStyle: "bob", hairColor: 6, shirt: 9, pants: 4, eye: 2, beard: "none", bottom: "skirt" },
   asci:    { body: "m", skin: 3, hairStyle: "short", hairColor: 7, shirt: 9, pants: 1, eye: 0, beard: "mustache", bottom: "pants" },
   kurye:   { body: "m", skin: 5, hairStyle: "curly", hairColor: 0, shirt: 2, pants: 4, eye: 0, beard: "stubble", bottom: "pants" },
-  cagri:   { body: "f", skin: 0, hairStyle: "long", hairColor: 4, shirt: 7, pants: 6, eye: 1, beard: "none", bottom: "pants" }
+  cagri:   { body: "f", skin: 0, hairStyle: "long", hairColor: 4, shirt: 7, pants: 6, eye: 1, beard: "none", bottom: "pants" },
+  temizlik:{ body: "m", skin: 2, hairStyle: "short", hairColor: 1, shirt: 4, pants: 2, eye: 0, beard: "stubble", bottom: "pants" }
 };
 const STAFF_ALT = [
   { body: "f", skin: 3, hairStyle: "bob", hairColor: 1, eye: 2, beard: "none", bottom: "pants" }, { body: "m", skin: 1, hairStyle: "short", hairColor: 3, eye: 1, beard: "stubble", bottom: "pants" },
   { body: "f", skin: 5, hairStyle: "ponytail", hairColor: 0, eye: 0, beard: "none", bottom: "pants" }, { body: "m", skin: 2, hairStyle: "curly", hairColor: 2, eye: 0, beard: "none", bottom: "pants" },
   { body: "m", skin: 0, hairStyle: "buzz", hairColor: 5, eye: 1, beard: "beard", bottom: "pants" }, { body: "f", skin: 4, hairStyle: "long", hairColor: 6, eye: 2, beard: "none", bottom: "skirt" }];
 const front = s => { // istasyonun önünde durma noktası (mutfak tarafı)
-  if (s.type === "table") return new THREE.Vector3(s.x + .2, FLOOR_Y, s.z + .85);
+  if (s.type === "table") return new THREE.Vector3(s.x + .2, FLOOR_Y + (s.fl ? TER_H : 0), s.z + .85);
   if (s.z <= -4) return new THREE.Vector3(s.x, FLOOR_Y, -3.55);
   if (Math.abs(s.z + 1) < .2) return new THREE.Vector3(s.x, FLOOR_Y, -1.75);
   if (s.type === "drive") return new THREE.Vector3(s.x - .9, FLOOR_Y, s.z);
@@ -6926,7 +7121,17 @@ const kitchenSide = v => v.z < -1.3 && v.x < 6.6;
 /* mutfak ↔ salon geçişi bar ucundan (x≈5,2) yapılır */
 function routeTo(from, to){
   // dışarıdaki ofise kapıdan girilir
+  if (V && V.stair){ const S = V.stair, upF = v => v.y > FLOOR_Y + S.h / 2;   // teras katı: merdivenden
+    if (upF(to) && !upF(from)) return routeTo(from, S.bot).concat([S.top.clone(), to.clone()]);
+    if (upF(from) && !upF(to)) return [S.top.clone(), S.bot.clone()].concat(routeTo(S.bot, to));
+    if (upF(from) && upF(to)) return [to.clone()]; }
   if (save.level >= 2){ const door = new THREE.Vector3(-8.3, FLOOR_Y, -3.75), inn = new THREE.Vector3(-9.8, FLOOR_Y, -3.75);
+    // çağrı merkezi odası: ofisin içinden iç kapıyla
+    if (V && V.callDoor){ const inC = v => v.x < V.callX1, [cA, cB] = V.callDoor;
+      if (inC(to) && !inC(from)) return routeTo(from, cA).concat([cB.clone(), to.clone()]);
+      if (inC(from) && !inC(to)) return [cB.clone(), cA.clone()].concat(routeTo(cA, to));
+      if (inC(from) && inC(to)) return [to.clone()]; }
+    if (to.x < -9.1 && from.x < -9.1) return [to.clone()];
     if (to.x < -9.1 && from.x > -9.1) return routeTo(from, door).concat([inn, to.clone()]);
     if (from.x < -9.1 && to.x > -9.1) return [inn, door].concat(routeTo(door, to)); }
   if (save.level < 2 || kitchenSide(from) === kitchenSide(to)) return [to.clone()];
@@ -6952,7 +7157,7 @@ function staffHomeAt(){
   return save.level === 1
     ? { kasiyer: new THREE.Vector3(-2.0, FLOOR_Y, 1.6), garson: new THREE.Vector3(.6, FLOOR_Y, 1.0), asci: new THREE.Vector3(-2.8, FLOOR_Y, -1.6) }
     : { kasiyer: new THREE.Vector3(-5.85, FLOOR_Y, -1.75), komi: V.komiIdle, garson: new THREE.Vector3(-1.6, FLOOR_Y, -2.3), asci: new THREE.Vector3(-4.6, FLOOR_Y, -3.5),
-    kurye: new THREE.Vector3(-7.3, FLOOR_Y, -.2), cagri: V.officeSpot || idle[0] };
+    kurye: new THREE.Vector3(-7.3, FLOOR_Y, -.2), cagri: (V.callSpots && V.callSpots[0]) || V.officeSpot || idle[0], temizlik: V.wc ? V.wc.idle : idle[0] };
 }
 /* personel kapıdan girer (Lv2+): içeri girince yerine geçer; büfede (Lv1) direkt yerinde belirir */
 function walkIn(w, k){
@@ -6968,7 +7173,7 @@ function spawnStaff(arrive){
   Object.keys(STAFF_DEF).forEach(k => {
     if (!hasStaff(k) || !at[k] || ((k === "kurye" || k === "cagri") && !stations.some(s => s.type === "pack"))) return;
     const n = Math.min(staffCount(k), STAFF_VIS);
-    for (let i = 0; i < n; i++){ const p = at[k].clone(); p.x += (i % 2 ? .55 : -.55) * Math.ceil(i / 2); const w = mkWorker(k, p, i); if (arrive) walkIn(w, k0++); staff.push(w); }
+    for (let i = 0; i < n; i++){ const p = staffHome(at[k], i); const w = mkWorker(k, p, i); if (arrive) walkIn(w, k0++); staff.push(w); }
   });
 }
 /* vardiya ortasında işe alınan kişi hemen gelir */
@@ -6977,7 +7182,7 @@ function staffJoinNow(k){
   const at = staffHomeAt(); if (!at[k]) return false;
   if ((k === "kurye" || k === "cagri") && !st("pack")) return false;
   const i = staff.filter(w => w.k === k).length; if (i >= Math.min(STAFF_VIS, staffCount(k))) return false;
-  const p = at[k].clone(); p.x += (i % 2 ? .55 : -.55) * Math.ceil(i / 2);
+  const p = staffHome(at[k], i);
   const w = mkWorker(k, p, i); walkIn(w, 0); staff.push(w);
   if (save.level < 2) emit(p.x, 1.2, p.z, { color: 0xffe08a, n: 10, size: .2, life: .8, vy: .8, vxz: .8 });
   return true;
@@ -7002,12 +7207,38 @@ function needBalance(){
   return { needs, missing, burgersMissing, extraB: Math.ceil(Math.max(0, burgersMissing.length - patties * (1 + upLv("burgerX"))) / (1 + upLv("burgerX"))), extraF: Math.max(0, missing.filter(x => x.n.k === "fries").length - fries), colas: missing.filter(x => x.n.k === "cola").length };
 }
 const st = type => stations.find(s => s.type === type);
+/* personelin duracağı nokta dükkânın içinde ve bir engelin (duvar, tezgâh, masa) içinde değil mi? */
+function staffHome(base, i){   // aynı işi yapanların bekleme yerleri: yan yana, duvara/tezgâha girmeden
+  if (!i) return base.clone();
+  const C = []; for (let a = -4; a <= 4; a++) for (let b = -4; b <= 4; b++) if (a || b) C.push([a * .6, b * .6]);
+  C.sort((p, q) => (Math.abs(p[1]) * 1.6 + Math.hypot(p[0], p[1])) - (Math.abs(q[1]) * 1.6 + Math.hypot(q[0], q[1])));   // önce yan yana, sonra arkalı önlü küçük bir öbek
+  let k = 0;
+  for (const [dx, dz] of C){ const p = base.clone(); p.x += dx; p.z += dz; if (!spotOK(p, .25)) continue; if (++k === i) return p; }
+  const p = base.clone(); p.x += .5 * i; return p;
+}
+function spotOK(c, m){
+  if (!V || !V.bounds) return true; const up = V.stair && c.y > FLOOR_Y + V.stair.h / 2, b = up ? V.bounds2 : V.bounds;
+  if (c.x < b.x0 + m || c.x > b.x1 - m || c.z < b.z0 + m || c.z > b.z1 - m) return false;
+  if (V.stair && inStair(c)) return false;
+  return !((up ? V.obst2 : V.obst) || []).some(o => c.x > o.x0 - m && c.x < o.x1 + m && c.z > o.z0 - m && c.z < o.z1 + m);
+}
 function updateWorker(w, dt){
   let moving = false;
   w.cool -= dt;
   const at = (dest0) => {
     let dest = dest0;
-    if (w.n && dest0){ dest = dest0.clone(); const o = (w.n % 2 ? .5 : -.5) * Math.ceil(w.n / 2); if (kitchenSide(dest0) || dest0.z < -1) dest.x = clamp(dest.x + o, -8.3, 6.4); else dest.z += o * .6; }
+    // herkes aynı noktaya koşmasın: hedef noktada boş bir yer seç (dolu olanı başka eleman tutmuş)
+    if (dest0){
+      if (w.d0 && w.d0.distanceTo(dest0) < .05 && w.slotDest) dest = w.slotDest;
+      else {
+        const lateral = kitchenSide(dest0) || dest0.z < -1, taken = staff.filter(o => o !== w && o.slotDest).map(o => o.slotDest), inside = spotOK(dest0, 0);
+        for (let i = 0; i < (inside ? 11 : 1); i++){ const o = (i % 2 ? .6 : -.6) * Math.ceil(i / 2), c = dest0.clone(); if (lateral) c.x += o; else c.z += o * .7;
+          if (i && !spotOK(c, .22)) continue;
+          if (!taken.some(t => t.distanceTo(c) < .5)){ dest = c; break; } }
+        if (w.slotDest && w.slotDest.distanceTo(dest) > .05) w.path = [];
+        w.d0 = dest0.clone(); w.slotDest = dest;
+      }
+    }
     if (!w.path.length && w.group.position.distanceTo(dest) < .15) return true; if (!w.path.length) goPath(w, dest); moving = !stepPath(w, dt); return !moving && w.group.position.distanceTo(dest) < .2; };
   if (w.entering){ if (stepPath(w, dt)) w.entering = false; animSim(w.sim, dt, w.entering ? staffSpeed(w) : 0, w.hand.length > 0); place(w.lbl, w.group.position.x, 2.15, w.group.position.z); return; }
   if (game.running && !game.paused){
@@ -7015,14 +7246,8 @@ function updateWorker(w, dt){
   } else if (w.group.position.distanceTo(w.home) > .2){ at(w.home); moving = true; }
   if (w.emptyTray) w.emptyTray.visible = !w.hand.length;
   if (w.state !== "work") animSim(w.sim, dt, moving ? staffSpeed(w) : 0, w.hand.length > 0 || !!w.emptyTray);
-  // birbirinin içine girmesinler: yakın personeli hafifçe it
-  // paketçiler yoldayken ve yürüyen personel birbirini itmez (kapıda kilitlenme olmasın); duranlar nazikçe aralanır
-  const ghost = x => (x.k === "kurye" && x.state !== "idle") || x.entering;
-  if (!ghost(w)) for (const c of customers){ if (!c.group) continue; const dx = w.group.position.x - c.group.position.x, dz = w.group.position.z - c.group.position.z, d = Math.hypot(dx, dz);
-    if (d > .001 && d < .42 && w.state !== "work"){ const k = (.42 - d) * Math.min(1, dt * 5); w.group.position.x += dx / d * k; w.group.position.z += dz / d * k; } }
-  if (!ghost(w)) for (const o of staff){ if (o === w || ghost(o)) continue; const dx = w.group.position.x - o.group.position.x, dz = w.group.position.z - o.group.position.z, d = Math.hypot(dx, dz);
-    if (d > .001 && d < .5){ const k = (.5 - d) * Math.min(1, dt * 6); w.group.position.x += dx / d * k; w.group.position.z += dz / d * k; } }
-  place(w.lbl, w.group.position.x, 2.15, w.group.position.z);
+  // personel birbirinin ve müşterilerin içinden geçer: itişme yok, kapıda/koridorda takılma olmaz
+  place(w.lbl, w.group.position.x, 2.15 + w.group.position.y - FLOOR_Y, w.group.position.z);
   if (mode !== "game") w.lbl.style.display = "none";
 }
 function busyAnim(w){ workPose(w.sim); }
@@ -7037,6 +7262,8 @@ const WORKER_AI = {
       return;
     }
     const reg = st("register"); if (!reg) return;
+    const mainCash = staff.find(o => o.k === "kasiyer" && !(o.n === 1 && drv) && !o.entering);
+    if (mainCash && mainCash !== w) return WORKER_AI.garson(w, dt, at);   // fazla kasiyer kasada dikilmez, servise yardım eder
     if (!at(front(reg))) return true;
     turnTo(w, Math.PI, dt);
     const f = frontQueue();
@@ -7106,15 +7333,15 @@ const WORKER_AI = {
       const busyC = staff.filter(o => o !== w && o.job && o.job.k === "deliver").map(o => o.job.x.c);
       const needs = remainingNeeds().sort((a, b) => (isStar(b.c) - isStar(a.c)) || (busyC.includes(a.c) - busyC.includes(b.c)) || (a.c.patience / a.c.maxP) - (b.c.patience / b.c.maxP));   // en sabırsız ve başka garsonun gitmediği müşteri önce
       if (w.hand.length){
-        const tgt = needs.find(x => w.hand.some(it => matches(it, x.n)));
+        const tgt = needs.find(x => !busyC.includes(x.c) && w.hand.some(it => matches(it, x.n))) || needs.find(x => w.hand.some(it => matches(it, x.n)));
         if (tgt) w.job = { k: "deliver", x: tgt };
         else { const free = counters().find(s => s.items.length < capOf()); w.job = free ? { k: "drop", s: free } : null; }
       } else {
-        const carried = staff.filter(o => o !== w && o.k === "garson").flatMap(o => o.hand.concat(o.job && o.job.k === "pick" ? o.job.s.items : []));
+        const carried = staff.filter(o => o !== w && (o.k === "garson" || o.k === "kasiyer")).flatMap(o => o.hand.concat(o.job && o.job.k === "pick" ? o.job.s.items : []));
         carried.forEach(it => { const i = needs.findIndex(x => matches(it, x.n)); if (i >= 0) needs.splice(i, 1); });
         const ctr = counters().find(s => s.items.some(it => needs.some(x => matches(it, x.n))) && !staff.some(o => o !== w && o.job && o.job.k === "pick" && o.job.s === s));
         if (ctr) w.job = { k: "pick", s: ctr };
-        else if (needBalance().colas > 0 && st("fridge")) w.job = { k: "cola" };
+        else if (st("fridge") && needBalance().colas > staff.filter(o => o !== w && o.job && o.job.k === "cola").length * capOf()) w.job = { k: "cola" };
       }
       if (!w.job){ w.idleT = .5; return !at(w.home); }
     }
@@ -7148,20 +7375,34 @@ const WORKER_AI = {
   },
   kurye(w, dt, at){
     const pack = st("pack"); if (!pack) return;
-    if (w.state === "away"){ w.t -= dt; w.group.visible = false; if (w.t <= 0){ w.state = "back"; w.group.visible = true; w.group.position.copy(V.spawn); { const sp = new THREE.Vector3(-7.3, FLOOR_Y, -.2 + w.n * .7), e1 = V.enter[1].clone(); e1.x += (w.n % 2 ? .45 : -.45); w.path = [V.enter[0].clone(), e1].concat(routeTo(e1, sp)); } SND.play("honk", .4); } return; }
+    if (w.state === "away"){ w.t -= dt; w.group.visible = false; if (w.t <= 0){ w.state = "back"; w.group.visible = true; w.group.position.copy(V.spawn); { const sp = staffHome(new THREE.Vector3(-7.3, FLOOR_Y, -.2), w.n || 0), e1 = V.enter[1].clone(); e1.x += (w.n % 2 ? .45 : -.45); w.path = [V.enter[0].clone(), e1].concat(routeTo(e1, sp)); } SND.play("honk", .4); } return; }
     if (w.state === "back"){ if (stepPath(w, dt)){ w.state = "idle"; } return true; }
     if (w.state === "out"){ if (stepPath(w, dt)){ w.state = "away"; w.t = 14 + Math.random() * 6; const o = w.order; w.order = null; deliverPhone(o); } return true; }
     const ready = game.phone.find(o => o.ready && !o.taken);
-    const spot = new THREE.Vector3(-7.3, FLOOR_Y, -.2 + w.n * .7);
+    const spot = staffHome(new THREE.Vector3(-7.3, FLOOR_Y, -.2), w.n || 0);
     if (!ready) return !at(spot);
     if (!at(spot)) return true;
     ready.taken = true; w.order = ready; updatePackBags();
     { const x0 = V.exit[0].clone(); x0.x += (w.n % 2 ? .45 : -.45); w.path = routeTo(w.group.position, x0).concat([V.exit[1].clone(), V.exit[2].clone()]); } w.state = "out"; SND.play("pickup", .4);
     return true;
   },
+  temizlik(w, dt, at){
+    const wcS = st("wc"), wc = game.wc;
+    if (!w.target){
+      if (wcS && wc && wc.dirt >= 1 && !staff.some(o => o !== w && o.target === wcS)){ w.target = wcS; w.state = "walk"; }
+      else { const t = tables.find(t => t.dirty && !t.claimed); if (t){ t.claimed = true; w.target = t; w.state = "walk"; } }
+    }
+    if (!w.target){ w.state = "idle"; return !at(w.home); }
+    if (w.state === "walk" && at(front(w.target))){ w.state = "work"; w.t = w.target === wcS ? 2.6 : 2.0; }
+    if (w.state === "work"){ busyAnim(w); w.t -= dt; if (w.t <= 0){
+      if (w.target === wcS){ if (wc) wc.dirt = 0; popup("✨ Tuvalet tertemiz", wcS.x, 2.3, wcS.z, "#bfe6ff"); }
+      else { cleanTable(w.target); w.target.claimed = false; }
+      w.target = null; w.state = "idle"; } }
+  },
   cagri(w, dt, at){
-    const off = st("office"); if (!off) return;
-    if (!at(front(off))) return true;
+    const spots = V && V.callSpots;
+    if (spots && spots.length){ if (!at(spots[(w.n || 0) % spots.length])) return true; }   // kendi masası (çağrı merkezi odası)
+    else { const off = st("office"); if (!off) return; if (!at(front(off))) return true; }
     turnTo(w, Math.PI, dt);
     if (game.phone.some(o => !o.ready && o.fresh > 0)) busyAnim(w);
   }
@@ -7170,6 +7411,15 @@ const othersDoing = (w, k) => staff.filter(o => o !== w && o.k === w.k && o.job 
 const needsTopping = it => it.want && ((it.want.cheese && !it.cheese) || (it.want.sauce && !it.sauce));
 function updateStaff(dt){ staff.forEach(w => updateWorker(w, dt)); }
 
+/* ---------- 🚻 tuvalet: kirlendikçe puan düşer ---------- */
+function wcTick(dt){
+  const wc = game.wc, W = V && V.wc; if (!wc || !W) return;
+  if (W.dirt) W.dirt.visible = wc.dirt >= 2;
+  if (wc.dirt < 3){ wc.warned = false; return; }
+  wc.t += dt;
+  if (!wc.warned){ wc.warned = true; flash(hasStaff("temizlik") ? "🚻 Tuvalet kirlendi: temizlikçi geliyor" : "🚻 Tuvalet kirlendi! Kapısına gidip temizle ya da 🧹 temizlikçi al", "#e9555b"); }
+  if (wc.t > 8){ wc.t = 0; const s = st("wc"); if (s) popup("🤢", s.x, 2.4, s.z, "#9bd16a"); if (Math.random() < .5) addRating(2); }
+}
 /* ---------- telefon siparişleri (çağrı merkezi + kurye) ---------- */
 function phoneTick(dt){
   const web = !!save.webAd;
@@ -7356,7 +7606,7 @@ function awardScore(){
   return stars() * 14 + Math.min(20, served / 8 * 15) + Math.min(30, rev / REV_EXPECT[save.level] * 25) + capPerk("award");
 }
 function maybeAwards(cb){
-  if (save.level < 2 || previewBackup || !save.shifts || save.shifts % 5 !== 0 || save.awardAt === save.shifts || (lastSummary && lastSummary.work)){ cb(); return; }
+  if (save.level < 2 || previewBackup || !save.shifts || save.shifts % 10 !== 0 || save.shifts - (save.awardAt || 0) < 10 || (lastSummary && lastSummary.work)){ cb(); return; }
   save.awardAt = save.shifts;
   const me = awardScore(), base = 70 + save.level * 2;
   const list = RIVALS.slice().sort(() => Math.random() - .5).slice(0, 3).map(n => ({ n, s: base + Math.random() * 24 - 10 })).concat([{ n: "Couple's Burger", s: me, me: true }]).sort((a, b) => b.s - a.s);
@@ -7491,14 +7741,15 @@ function cine(kicker, title, sub, done, ms = 2300){
 
 /* ---------- vardiya bağlantıları ---------- */
 function ecoShiftStart(){
-  Object.assign(game, { pc: {}, ingDisc: 0, taxSave: 0, phone: [], phoneT: 18, phoneSeq: 0, problem: null, probCount: 0, officeT: 70 + Math.random() * 60, slowCook: 1, fryBroken: 0, gurmeAt: null, gurmeDone: false, newsQ: [] });
+  Object.assign(game, { wc: { dirt: 0, t: 0, warned: false }, pc: {}, ingDisc: 0, taxSave: 0, phone: [], phoneT: 18, phoneSeq: 0, problem: null, probCount: 0, officeT: 70 + Math.random() * 60, slowCook: 1, fryBroken: 0, gurmeAt: null, gurmeDone: false, newsQ: [] });
   game.stats.byPlayer = [0, 0, 0];
+  if (V && V.stair){ game.d.spawnMin *= .82; game.d.spawnMax *= .82; }   // teras daha çok müşteri çeker
   if (save.adBoost){ game.d.spawnMin *= .74; game.d.spawnMax *= .74; game.adOn = true; save.adBoost = 0; writeSave(); } else game.adOn = false;
   if (save.level >= 2 && !game.tutorial && save.shifts - (save.gurmeShift ?? -9) >= 3 && Math.random() < .4) game.gurmeAt = game.d.shift * (.3 + Math.random() * .3);
   applyDayTime.last = null; applyDayTime(10);
 }
 function ecoTick(dt){
-  phoneTick(dt); officeTick(dt);
+  phoneTick(dt); officeTick(dt); wcTick(dt);
   if (game.gurmeAt != null && game.time <= game.gurmeAt && !game.gurmeDone && !customers.some(c => c.kind === "gurme")){
     game.gurmeAt = null; save.gurmeShift = save.shifts; spawnCustomer("gurme");
     flash("🎩 Gurme Selim Bey geldi! Mükemmel ve hızlı servis = puanın tamamen düzelir", "#c9a227"); SND.play("banner");
@@ -7571,7 +7822,7 @@ function renderOrderRail(dt){
   if (mode !== "game" || !game.running){ if (railKey){ railKey = ""; el.innerHTML = ""; } el.style.display = "none"; return; }
   const list = [];
   customers.forEach(c => { if (!c.order || c.state === "leaving" || c.state === "eating" || orderLeft(c).length === 0) return;
-    list.push({ ic: c.table ? "🍽️" : "🧾", where: c.table ? "Masa " + c.table.id.replace("table", "") : "Tezgâh", c, badge: KIND_BADGE[c.kind] || "" }); });
+    list.push({ ic: c.table ? (c.table.fl ? "☀️" : "🍽️") : "🧾", where: c.table ? (c.table.fl ? "Teras " + c.table.id.replace("ttable", "") : "Masa " + c.table.id.replace("table", "")) : "Tezgâh", c, badge: KIND_BADGE[c.kind] || "" }); });
   cars.forEach(c => { if (c.order && c.state !== "leaving" && orderLeft(c).length) list.push({ ic: "🚗", where: "Drive", c, badge: "" }); });
   (game.phone || []).forEach(o => { if (!o.done && !o.ready) list.push({ ic: "📞", where: "Paket #" + o.id, c: o, badge: "" }); });
   const waitingOrder = customers.filter(c => !c.order && (c.state === "queue" || c.state === "waiting") && !c.path.length).length + cars.filter(c => !c.order && c.state !== "leaving").length;
@@ -7599,7 +7850,11 @@ const OFFICE_ITEMS = {
 /* her eşyanın aynı duvar boyunca seçilebilen yerleri (↻ ile değiştirilir) */
 const OFFICE_ALT = { rug: [[7.85, -3.25], [7.6, -3.1], [8.1, -3.3]], plant: [[7.05, -2.9], [8.85, -2.85], [7.0, -4.75]], art: [[6.86, -3.75], [6.86, -4.4], [6.86, -3.1]],
   chair: [[8.6, -3.1], [8.6, -3.6], [8.6, -2.9]], shelf: [[7.0, -4.72], [7.0, -4.2], [7.0, -3.7]], coffee: [[8.72, -4.72], [8.3, -4.75], [7.35, -4.75]], trophy: [[8.8, -3.95], [8.8, -4.5], [8.8, -3.4]], lamp: [[8.85, -2.85], [7.0, -2.85], [8.85, -4.7]] };
-const officePos = k => { const a = OFFICE_ALT[k], i = ((save.office && save.office.pos) || {})[k] || 0, p = a ? a[i % a.length] : [OFFICE_ITEMS[k].x, OFFICE_ITEMS[k].z];
+const officeRect = () => { const ofl = WORK ? 0 : Math.min(3, ((save.expand || {}).office) || 0); return { x0: -15.2 - ofl * 1.6, x1: -9, z0: -5, z1: .6 + ofl * .8 }; };
+const officeXY = () => { save.office = save.office || { items: [] }; return save.office.xy || (save.office.xy = {}); };
+const officeUV = k => { const R = officeRect(), [x, z] = officePosRaw(k); return [(x - R.x0 - .5) / (R.x1 - R.x0 - 1), (z - R.z0 - .5) / (R.z1 - R.z0 - 1), 0]; };
+const officePos = k => { const c = ((save.office || {}).xy || {})[k]; if (c){ const R = officeRect(); return [R.x0 + .5 + clamp(c[0], 0, 1) * (R.x1 - R.x0 - 1), R.z0 + .5 + clamp(c[1], 0, 1) * (R.z1 - R.z0 - 1)]; } return officePosRaw(k); };
+const officePosRaw = k => { const a = OFFICE_ALT[k], i = ((save.office && save.office.pos) || {})[k] || 0, p = a ? a[i % a.length] : [OFFICE_ITEMS[k].x, OFFICE_ITEMS[k].z];
   const ofl = WORK ? 0 : Math.min(3, ((save.expand || {}).office) || 0); return [-14.9 - ofl * 1.6 + (p[0] - 6.75) * (2.55 + ofl * .7), -4.85 + (p[1] + 5) * (2.3 + ofl * .35)]; };     // büyük ofis odası     // ofis artık restoranın solunda, dışarıda
 let officeMeshes = [];
 const officeOwn = () => (save.office && save.office.items) || [];
@@ -7610,7 +7865,7 @@ function buildOfficeDecor(list){
   const leather = M(0x5a2e1c, { r: .38 }), walnut = M(0x5a3a22, { r: .55 }), brass = M(0xc9a227, { m: .8, r: .3 });
   own.forEach(k => {
     const d = OFFICE_ITEMS[k]; if (!d) return;
-    const [ox, oz] = officePos(k); const g = new THREE.Group(); g.position.set(ox, Y, oz); world.add(g); officeMeshes.push(g);
+    const [ox, oz] = officePos(k); const g = new THREE.Group(); g.position.set(ox, Y, oz); world.add(g); officeMeshes.push(g); g.userData.k = k;
     switch (k){
       case "rug": { const t = T("offRug", 128, 96, (c, w, h) => { c.fillStyle = "#7a1f2a"; c.fillRect(0, 0, w, h); c.strokeStyle = "#d9b26a"; c.lineWidth = 5; c.strokeRect(7, 7, w - 14, h - 14); c.strokeStyle = "#1f3b52"; c.lineWidth = 3; c.strokeRect(16, 16, w - 32, h - 32); });
         const r = mk(new THREE.PlaneGeometry(1.5, 1.0), stdMap(t, .95), 0, .006, 0, g, false, true); r.rotation.x = -Math.PI / 2; break; }
@@ -7629,7 +7884,40 @@ function buildOfficeDecor(list){
       case "lamp": mk(CYL(.14, .16, .04, 14), brass, 0, .02, 0, g); mk(CYL(.02, .02, 1.5, 8), brass, 0, .77, 0, g); mk(CYL(.15, .24, .3, 16, true), M(0xfff1d6, { e: 0xffe3a0, ei: .7, ds: true }), 0, 1.6, 0, g); break;
     }
     g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    const c = ((save.office || {}).xy || {})[k]; if (c && c[2]) g.rotation.y += c[2] * Math.PI / 2;
   });
+}
+/* ---------- ofisi sürükle-bırak düzenleme (ev eşyası gibi) ---------- */
+const officeEd = { on: false, sel: null, drag: null, off: [0, 0] };
+function arrangeOffice(back){
+  if (!officeOwn().length){ flash("Önce ofise eşya al", "#e9555b"); return; }
+  if (mode === "game" && game.running){ flash("Vardiya bitince düzenleyebilirsin", "#f0a42a"); return; }
+  const prevMode = mode, inHome = mode === "home";
+  closeOverlay(); clearActors(); buildVenue(); setMode("preview");
+  const R = officeRect(); cam.target.set((R.x0 + R.x1) / 2, .4, (R.z0 + R.z1) / 2); cam.r = 13 + (R.x1 - R.x0) * .7; cam.az = 0; cam.polar = .62;
+  officeEd.on = true; officeEd.sel = null; officeEd.drag = null;
+  const bar = () => {
+    modal(`<div class="prev-bar"><b>🛠 Ofisi düzenle</b><span class="small">${officeEd.sel ? `${OFFICE_ITEMS[officeEd.sel].ic} ${OFFICE_ITEMS[officeEd.sel].n} seçili · sürükle` : "Bir eşyayı parmağınla / fareyle sürükle"}</span>
+      <button class="sec" id="oeRot" ${officeEd.sel ? "" : "disabled"}>↻ Döndür</button><button class="sec" id="oeReset">⟲ Sıfırla</button><button id="oeOk">✓ Bitti</button></div>`);
+    overlay.classList.add("prev-ov");
+    on("oeRot", () => { const k = officeEd.sel; if (!k) return; const xy = officeXY(), c = xy[k] || officeUV(k); c[2] = ((c[2] || 0) + 1) % 4; xy[k] = c; writeSave(); buildOfficeDecor(); SND.play("step", .2); });
+    on("oeReset", () => { save.office.xy = {}; writeSave(); buildOfficeDecor(); officeEd.sel = null; bar(); });
+    on("oeOk", () => { officeEd.on = false; officeEd.sel = null; officeEd.drag = null; overlay.classList.remove("prev-ov"); closeOverlay(); if (inHome) goHome(true); else setMode(prevMode); flash("🗂️ Ofis düzeni kaydedildi", "#43c06a"); back && back(); });
+  };
+  officeEd.bar = bar; bar();
+}
+function floorHitAt(cx, cy){ const v = new THREE.Vector2(cx / innerWidth * 2 - 1, -(cy / innerHeight) * 2 + 1); raycaster.setFromCamera(v, camera); const h = new THREE.Vector3(); return raycaster.ray.intersectPlane(floorPlane, h) ? h : null; }
+function officeEdPtr(type, cx, cy){
+  if (!(officeEd.on && mode === "preview")) return false;
+  if (type === "down"){ const h = floorHitAt(cx, cy); if (!h) return false;
+    let best = null, bd = 1.3; officeMeshes.forEach(g => { const d = Math.hypot(g.position.x - h.x, g.position.z - h.z) + (g.userData.k === "rug" ? .4 : 0); if (d < bd){ bd = d; best = g; } });
+    if (!best) return false; officeEd.drag = best; officeEd.off = [best.position.x - h.x, best.position.z - h.z];
+    if (officeEd.sel !== best.userData.k){ officeEd.sel = best.userData.k; officeEd.bar && officeEd.bar(); } return true; }
+  if (type === "move"){ const g = officeEd.drag; if (!g) return false; const h = floorHitAt(cx, cy); if (h){ const R = officeRect();
+      g.position.x = clamp(h.x + officeEd.off[0], R.x0 + .5, R.x1 - .5); g.position.z = clamp(h.z + officeEd.off[1], R.z0 + .5, R.z1 - .5); } return true; }
+  if (type === "up"){ const g = officeEd.drag; if (!g) return false; officeEd.drag = null; const R = officeRect(), xy = officeXY(), k = g.userData.k, old = xy[k] || officeUV(k);
+    xy[k] = [(g.position.x - R.x0 - .5) / (R.x1 - R.x0 - 1), (g.position.z - R.z0 - .5) / (R.z1 - R.z0 - 1), old[2] || 0]; writeSave(); SND.play("place", .5); return true; }
+  return false;
 }
 function showOfficeDesign(back){
   const own = officeOwn();
@@ -7637,10 +7925,11 @@ function showOfficeDesign(back){
     <p>Ofisini döşe ve eşyaların yerini ↻ ile değiştir: her eşya personelin moralini her vardiya artırır (şu an <b>+${officeMorale()}</b>/vardiya). Ofis ne kadar şıksa sorunlar o kadar tatlıya bağlanır.</p>
     <div class="cards">${Object.entries(OFFICE_ITEMS).map(([k, d]) => { const has = own.includes(k);
       return `<div class="card ${has ? "on" : ""}"><div class="ic">${d.ic}</div><b>${d.n}</b><small>Personel morali +${d.mor}/vardiya</small><div class="pr">${has ? "Ofiste" : "$" + fmt(d.price)}</div>
-        ${has ? `<button class="sec" data-ofm="${k}">↻ Yerini değiştir</button>` : `<button data-ofi="${k}" ${save.money < d.price ? "disabled" : ""}>${save.money < d.price ? "Para yetmiyor" : "Satın al"}</button>`}</div>`; }).join("")}</div>
-    <div class="btns"><button class="sec" id="ofdBack">← Geri</button></div>`, true);
+        ${has ? `<button class="sec" data-ofm="${k}">↻ Hazır yerler</button>` : `<button data-ofi="${k}" ${save.money < d.price ? "disabled" : ""}>${save.money < d.price ? "Para yetmiyor" : "Satın al"}</button>`}</div>`; }).join("")}</div>
+    <div class="btns"><button class="sec" id="ofdBack">← Geri</button>${own.length ? `<button id="ofdArr">🛠 Sürükle-bırak düzenle</button>` : ""}</div>`, true);
   on("ofdBack", () => back ? back() : closeOverlay());
-  overlay.querySelectorAll("[data-ofm]").forEach(b => b.onclick = () => { const k = b.dataset.ofm; save.office.pos = save.office.pos || {}; save.office.pos[k] = ((save.office.pos[k] || 0) + 1) % (OFFICE_ALT[k] || [0]).length; writeSave();
+  on("ofdArr", () => arrangeOffice(() => showOfficeDesign(back)));
+  overlay.querySelectorAll("[data-ofm]").forEach(b => b.onclick = () => { const k = b.dataset.ofm; if (save.office.xy) delete save.office.xy[k]; save.office.pos = save.office.pos || {}; save.office.pos[k] = ((save.office.pos[k] || 0) + 1) % (OFFICE_ALT[k] || [0]).length; writeSave();
     if (V && V.kind === "shop" && stations.some(x => x.type === "office")) buildOfficeDecor(); SND.play("step", .15); flash(`${OFFICE_ITEMS[k].ic} yeri değişti`, "#3d8bff"); });
   overlay.querySelectorAll("[data-ofi]").forEach(b => b.onclick = () => { const k = b.dataset.ofi, d = OFFICE_ITEMS[k]; if (save.money < d.price) return;
     save.money -= d.price; save.office = save.office || { items: [] }; save.office.items.push(k); writeSave(); SND.play("buy");
@@ -7807,7 +8096,7 @@ function goOut(k, only, otherDo){
   }
   const ppl = only != null && only >= 0 ? [only] : all, P = PLACES[k], cost = placePrice(k) * ppl.length;
   if (save.money < cost){ flash("💸 Bilet için para yetmiyor", "#e9555b"); return; }
-  save.money -= cost; save.home.daily = save.home.daily || {}; save.home.daily.out = true; lvqAdd("v", 1, k);
+  save.money -= cost; save.home.daily = save.home.daily || {}; save.home.daily.out = true; lvqAdd("v", 1, k); if (!isCouple() && !(typeof lifeOn === "function" && lifeOn())) lvqAdd("dates");
   let sideNote = "";
   if (only != null && only >= 0){ const o = all.find(x => x !== only), ch = save.chars[o], nm = save.sims[o].name;
     if (otherDo === "work"){ const pay = Math.round(18 * Math.max(1, LV().pm)); save.money += pay; ch.energy = Math.max(10, (ch.energy ?? 100) - 30); ch.streak = (ch.streak || 0) + 1; sideNote = `💼 ${nm} bu akşam ek mesaiye kaldı: +$${fmt(pay)}`; }
@@ -9870,6 +10159,19 @@ function doGesture(k){
 const homeQ = [];
 function homeQueue(fn){ homeQ.push(fn); }
 setInterval(() => { try { if (mode !== "home"){ homeQ.length = 0; return; } if (overlayOpen() || document.querySelector(".cine,.paper-ov,.award-ov") || activity) return; const f = homeQ.shift(); if (f) f(); } catch(e){} }, 700);
+/* eski hikâye kayıtları evde hazır bir sevgiliyle başlıyordu: hikâye modu tek başına başlar,
+   aşkı şehirde kendin bulursun (şehirde tanışıp kendin taşınan bir sevgili varsa korunur) */
+function storyMigrate(){
+  if (save.storyV2) return; save.storyV2 = true;
+  const L = save.life, own = L && L.livingId && L.livingId !== "p0";
+  if (!own){
+    save.rel = "single";
+    if (!L) save.life = newLife("single");
+    else { L.mode = "single"; if (L.livingId === "p0") L.livingId = null; if (L.met) delete L.met.p0; if (L.threads) delete L.threads.p0; if (L.pending) delete L.pending.p0; }
+    if (save.shifts > 0) setTimeout(() => flash("💔 Hikâye modu artık tek başına: aşkı şehirde kendin bulacaksın (📱 Şehir › insanlarla tanış)", "#7C5CE0"), 2500);
+  }
+  writeSave();
+}
 
 /* =====================================================================
    OYUN İÇİ ANLATIM: her yeni ürün, istasyon ve hareket ilk kez çıktığında
@@ -10209,7 +10511,7 @@ function addRestDecor(bounds){
   const auto = [].concat(tierOf() >= 2 ? ["plants"] : [], tierOf() >= 3 || save.tierDone ? ["lights"] : [], venueLux() >= 2 ? ["art"] : []);
   const it = [...new Set(((save.rdeco && save.rdeco.items) || []).concat(auto))]; if (!it.length) return;
   const { x0, x1, z0, z1 } = bounds;
-  if (it.includes("plants")) [[x0 + .4, z1 - .4], [x1 - .4, z1 - .4], [x1 - .4, z0 + 2.2], [x0 + .4, z0 + 2.4]].forEach(([x, z]) => pot(x, z, true).scale.setScalar(1.15));
+  if (it.includes("plants")) [[x0 + .4, z1 - .4], [x1 - .4, z1 - .4], [x1 - .4, z0 + 2.2], [x0 + .4, z0 + 2.4]].filter(([x, z]) => !(wcRect && x > wcRect.x0 && x < wcRect.x1 && z > wcRect.z0 && z < wcRect.z1 + 1)).forEach(([x, z]) => pot(x, z, true).scale.setScalar(1.15));
   if (it.includes("lights")){ const wire = M(0x2b2f36), bulb = M(0xfff1c1, { e: 0xffd27a, ei: 1.1, r: .3 });
     for (let x = x0 + .6; x < x1 - .4; x += .8) for (const z of [z1 - 1.4, (z0 + z1) / 2 + 1]){ mk(CYL(.006, .006, .3, 4), wire, x, 2.62, z, world, false); mk(SPH(.06, 10, 8), bulb, x, 2.45, z, world, false); } }
   if (it.includes("art")) [[x0 + .14, (z0 + z1) / 2 + 1.5, Math.PI / 2], [x1 - .14, (z0 + z1) / 2 + 1.5, -Math.PI / 2]].forEach(([x, z, r], i) => { const p = mk(new THREE.PlaneGeometry(1.1, .8), stdMap(pictureTex(7 + i)), x, 1.9, z, world, false); p.rotation.y = r; });
@@ -10846,7 +11148,7 @@ const REQ = {
   served: { t: p => `🍔 Bu mekânda ${p.n} sipariş hazırla`, cur: () => lvq().served, need: p => p.n, go: () => [() => goWork(), null, null], how: () => "Vardiyada (sen ya da ekibin) teslim edilen her sipariş sayılır." },
   stars:  { t: p => `⭐ Restoran puanı ${p.n.toFixed(1)}`, cur: () => Math.round(stars() * 10) / 10, need: p => p.n, go: () => [() => goWork(), null, null], how: () => "Siparişleri sıcak ve hızlı teslim et, müşteri bekletme." },
   co:     { t: p => `🏢 ${p.n} şirketin olsun`, cur: () => Object.keys(capState().co).length, need: p => p.n, go: () => [() => showHolding("co"), "[data-bbuy]:not([disabled])", "Satın al"], how: () => "📱 Telefon › 🏢 Holding › Şirketler." },
-  holding:{ t: () => "🏛️ Kendi holdingini kur", cur: () => capState().holding ? 1 : 0, need: () => 1, go: () => [() => showHolding("hold"), "#found", "Holding kur"], how: () => "3 şirket + yeterli net değer gerekir." },
+  holding:{ t: () => "🏛️ Kendi holdingini kur", cur: () => capState().holding ? 1 : 0, need: () => 1, go: () => Object.keys(capState().co).length < 3 ? [() => showHolding("co"), "[data-bbuy]:not([disabled])", "Önce 3 şirket"] : [() => showHolding("hold"), "#found", "Holding kur"], how: () => "3 şirket + yeterli net değer gerekir." },
   branch: { t: p => `🌍 ${p.n} yurt dışı şube`, cur: () => Object.entries(save.branches || {}).filter(([k, b]) => k !== "istanbul" && b.owned).length, need: p => p.n, go: () => [() => showMap(), "[data-buyc]", "Şube aç"],
             how: () => "📱 Telefon › 🌍 Şubeler." },
   stock:  { t: () => "📈 Borsadan hisse al", cur: () => Object.values(capState().stk || {}).some(n => n > 0) ? 1 : 0, need: () => 1, go: () => [() => showHolding("stk"), "[data-sbuy]:not([disabled])", "Al"], how: () => "📱 Telefon › 📈 Borsa." },
@@ -10855,13 +11157,14 @@ const REQ = {
   love:   { t: p => loveMode() === "couple" ? `💐 Bu mekândayken ${p.n} romantik jest` : `💘 Bu mekândayken ${p.n} kez sosyalleş (tanış, buluş, eve davet)`,
             cur: () => loveMode() === "couple" ? lvq().gest : lvq().meet + lvq().dates + lvq().guests, need: p => p.n,
             go: () => loveMode() === "couple" ? [() => showGestures(), "[data-ge]:not([disabled])", "Jest yap"] : [() => showCityMap(), "[data-place]", "Yeni insanlarla tanış"],
-            how: () => loveMode() === "couple" ? "Evde alttaki 💐 Jest butonu." : "Şehirde tanış, 📱 Kişiler'den buluşmaya çağır ya da eve davet et." },
+            how: () => loveMode() === "couple" ? "Evde alttaki 💐 Jest butonu." : lifeOn() ? "Şehirde tanış, 📱 Kişiler'den buluşmaya çağır ya da eve davet et." : "Birlikte şehre çıkın: her akşam gezmesi bir sosyalleşme sayılır." },
   fit:    { t: p => `💪 Spor salonuna toplam ${p.n} kez git`, cur: () => save.fit || 0, need: p => p.n, go: () => [() => showCityMap(), `[data-place="gym"]`, "Spora git"], how: () => "📱 Telefon › 🗺️ Şehir › 🏋️ Spor Salonu." },
   kid:    { t: p => `👶 Ailenizi büyütün (${p.n} çocuk)`, cur: () => (save.kids || []).length, need: p => p.n, go: () => [() => showFamily(), "#fmBaby", "Bebek"],
-            how: () => isCouple() ? "Evde 👶 Aile butonu (çift ya da birlikte yaşayan sevgililer)." : "Önce biriyle birlikte yaşa (📱 Kişiler), sonra 👶 Aile." },
-  kidhap: { t: p => `🧸 Çocuklarının mutluluğu %${p.n}+`, cur: () => (save.kids || []).length ? Math.min(...save.kids.map(k => Math.round(k.hap))) : 0, need: p => p.n, go: () => [() => showFamily(), "[data-kc]", "İlgilen"], how: () => "Evde 👶 Aile: besle, oyna, masal oku." },
+            how: () => ((save.home.type || "studio") === "studio" ? "Önce 🏡 stüdyodan büyük bir ev al. " : "") + (isCouple() ? "Evde 👶 Aile › Bebek sahibi olalım." : "Evde 👶 Aile › Evlat edin (bekâr ya da arkadaşsan da olur).") },
+  kidhap: { t: p => `🧸 Çocuklarının mutluluğu %${p.n}+`, cur: () => (save.kids || []).length ? Math.min(...save.kids.map(k => Math.round(k.hap))) : 0, need: p => p.n, go: () => (save.kids || []).length ? [() => showFamily(), "[data-kc]:not([disabled])", "İlgilen"] : [() => showFamily(), "#fmBaby", "Önce çocuk"], how: () => (save.kids || []).length ? "Evde 👶 Aile: her gün besle, oyna, masal oku." : "Önce 👶 Aile'den bir çocuk sahibi ol / evlat edin, sonra her gün ilgilen." },
   screen: { t: p => { const a = p.k === "edit" ? { ic: "🛠", n: "Evi düzenle" } : (phoneApps().find(x => x.id === p.k) || { ic: "📱", n: p.k }); return `📱 ${a.ic} ${a.n} ekranını keşfet`; }, cur: p => (save.screens || {})[p.k] ? 1 : 0, need: () => 1,
             go: p => p.k === "edit" ? [() => { closeOverlay(); qMarkBtn("#hbEdit", "Düzenle"); }, null, null] : [() => showPhone(), `[data-app="${p.k}"]`, "Aç"], how: p => p.k === "edit" ? "Evde alttaki 🛠 Düzenle: mobilyaları taşı, döndür." : "Telefonu aç, işaretli uygulamaya dokun." },
+  terrace:{ t: () => "🏙️ Bu mekâna teras katı yap", cur: () => hasTerrace() ? 1 : 0, need: () => 1, go: () => [() => showManage("exp"), "#terBuy", "Üst katı yap"], how: () => "📱 Telefon › 🏪 Restoran › Genişlet › Teras katı." },
   work:   { t: p => `💼 Kendi işletmende ${p.n} vardiya`, cur: () => lvq().work, need: p => p.n, go: () => [() => goWork(), null, null], how: () => "☕ Kahve Zinciri, 🥖 Fırın ya da 🏨 Otel al; 🌅 İşe git'te seç." }
 };
 /* 30 restoranın gereksinimleri (Lv1-5 + Lv6-30 mekânlar); sonrası otomatik üretilir */
@@ -10872,7 +11175,7 @@ const RQ = {
   4:  [{ k: "screen", kk: "car" }, { k: "screen", kk: "cap" }, { k: "home", kk: "house" }, { k: "car", kk: "city" }, { k: "visit", kk: "concert" }, { k: "recipe" }, { k: "outfit", n: 5 }, { k: "decor", n: 2 }, { k: "staff", kk: "kurye", n: 1 }, { k: "served", n: 140 }],
   5:  [{ k: "screen", kk: "stk" }, { k: "screen", kk: "bank" }, { k: "screen", kk: "map" }, { k: "screen", kk: "career" }, { k: "screen", kk: "hq" }, { k: "visit", kk: "casino" }, { k: "visit", kk: "gym" }, { k: "co", n: 1 }, { k: "car", kk: "sedan" }, { k: "furn", kk: "piano" }, { k: "up", id: "autoGrill", lv: 1 }, { k: "trip", n: 1 }, { k: "served", n: 200 }],
   6:  [{ k: "screen", kk: "dia" }, { k: "home", kk: "duplex" }, { k: "visit", kk: "cafe", n: 2 }, { k: "up", id: "bell", lv: 3 }, { k: "outfit", n: 6 }, { k: "staff", kk: "garson", n: 2 }, { k: "served", n: 250 }],
-  7:  [{ k: "visit", kk: "theatre" }, { k: "up", id: "music", lv: 3 }, { k: "decor", n: 3 }, { k: "love", n: 2 }, { k: "served", n: 280 }],
+  7:  [{ k: "visit", kk: "theatre" }, { k: "up", id: "music", lv: 3 }, { k: "decor", n: 3 }, { k: "love", n: 2 }, { k: "staff", kk: "temizlik", n: 1 }, { k: "served", n: 280 }],
   8:  [{ k: "trip", n: 1 }, { k: "up", id: "shoes", lv: 3 }, { k: "furn", kk: "aquarium" }, { k: "expand", kk: "salon", n: 1 }, { k: "served", n: 300 }],
   9:  [{ k: "visit", kk: "bowling" }, { k: "visit", kk: "concert", n: 2 }, { k: "up", id: "bigTray", lv: 2 }, { k: "staff", kk: "kasiyer", n: 2 }, { k: "outfit", n: 8 }, { k: "served", n: 330 }],
   10: [{ k: "home", kk: "villa" }, { k: "visit", kk: "club", n: 2 }, { k: "up", id: "ac", lv: 2 }, { k: "furn", kk: "bathtub" }, { k: "mood", n: 80 }, { k: "car", kk: "suv" }, { k: "served", n: 350 }],
@@ -10889,7 +11192,7 @@ const RQ = {
   21: [{ k: "fit", n: 15 }, { k: "visit", kk: "concert", n: 3 }, { k: "mood", n: 90 }, { k: "trip", n: 1 }, { k: "expand", kk: "salon", n: 2 }, { k: "served", n: 600 }],
   22: [{ k: "branch", n: 2 }, { k: "up", id: "bigTray", lv: 4 }, { k: "furn", kk: "pergola" }, { k: "served", n: 620 }],
   23: [{ k: "dist", n: 6 }, { k: "up", id: "shoes", lv: 6 }, { k: "decor", n: 4 }, { k: "work", n: 2 }, { k: "served", n: 640 }],
-  24: [{ k: "visit", kk: "club", n: 4 }, { k: "co", n: 4 }, { k: "up", id: "ac", lv: 4 }, { k: "furn", kk: "doghouse" }, { k: "served", n: 660 }],
+  24: [{ k: "visit", kk: "club", n: 4 }, { k: "co", n: 4 }, { k: "up", id: "ac", lv: 4 }, { k: "furn", kk: "doghouse" }, { k: "terrace" }, { k: "served", n: 660 }],
   25: [{ k: "home", kk: "island" }, { k: "stock" }, { k: "dep", n: 200000 }, { k: "up", id: "fastGrill", lv: 4 }, { k: "trip", n: 1 }, { k: "served", n: 680 }],
   26: [{ k: "kidhap", n: 70 }, { k: "visit", kk: "theatre", n: 3 }, { k: "up", id: "burgerX", lv: 3 }, { k: "love", n: 5 }, { k: "expand", kk: "kitchen", n: 2 }, { k: "served", n: 700 }],
   27: [{ k: "visit", kk: "casino", n: 2 }, { k: "outfit", n: 20 }, { k: "up", id: "music", lv: 8 }, { k: "served", n: 720 }],
@@ -10998,7 +11301,7 @@ function updateKids(dt){
     if (a.jump){ a.jump -= dt; pos.y = FLOOR_Y + Math.max(0, Math.sin(a.jump * 10)) * .25; } else pos.y = FLOOR_Y;
     place(a.lbl, pos.x, 1.0 + kidStage(a.k)[2], pos.z); a.lbl.style.display = ""; });
 }
-const canHaveKid = () => isCouple() && (save.home.type || "studio") !== "studio";
+const canHaveKid = () => (save.home.type || "studio") !== "studio";
 function showFamily(){
   const kids = save.kids || (save.kids = []), s = lifeScale(), babyCost = Math.round(300 * s);
   modal(`<h2>👶 Aile <span class="money">💵 $${fmt(save.money)}</span></h2>
@@ -11006,10 +11309,10 @@ function showFamily(){
       return `<div class="card"><div class="ic">${st[0]}</div><b>${escapeHtml(k.name)}</b><small>${st[1]} · ${age} günlük · mutluluk %${Math.round(k.hap)}</small><div class="bar"><i style="width:${Math.round(k.hap)}%"></i></div>
         <div class="stbtn"><button data-kc="${i}:feed" ${k.fed === save.day ? "disabled" : ""}>🍼 Besle ($${fmt(Math.round(8 * s))})</button><button class="sec" data-kc="${i}:play" ${k.played === save.day ? "disabled" : ""}>🧸 Oyna</button><button class="sec" data-kc="${i}:read" ${k.read === save.day ? "disabled" : ""}>📚 ${st[1] === "Bebek" ? "Ninni söyle" : st[1] === "Çocuk" ? "Masal oku" : "Ödevine yardım et"}</button></div></div>`; }).join("")}</div>` : `<p>Henüz çocuğunuz yok.</p>`}
     <div class="tipbox">Çocuklar her gün biraz ilgi bekler. Mutlulukları %30'un altına düşerse evin ruh hali düşer. Büyüdükçe (bebek → çocuk → genç) evde size eşlik ederler.</div>
-    <div class="btns"><button class="sec" id="fmB">← Geri</button>${kids.length < 3 ? `<button id="fmBaby" ${canHaveKid() && save.money >= babyCost ? "" : "disabled"}>${canHaveKid() ? `👶 Bebek sahibi olalım ($${fmt(babyCost)})` : "👶 Bebek için çift + bahçeli ev gerekli"}</button>` : ""}</div>`, true);
+    <div class="btns"><button class="sec" id="fmB">← Geri</button>${kids.length < 3 ? `<button id="fmBaby" ${canHaveKid() && save.money >= babyCost ? "" : "disabled"}>${canHaveKid() ? (isCouple() ? `👶 Bebek sahibi olalım ($${fmt(babyCost)})` : `🧸 Evlat edin ($${fmt(babyCost)})`) : "👶 Çocuk için önce stüdyodan büyük bir ev al"}</button>` : ""}</div>`, true);
   on("fmB", closeOverlay);
   on("fmBaby", () => { if (save.money < babyCost || !canHaveKid()) return; save.money -= babyCost; const body = Math.random() < .5 ? "f" : "m", nm = KID_NAMES[body][ri(6)];
-    const par = save.sims[Math.random() < .5 ? 0 : 1] || save.sims[0];
+    const par = (isCouple() ? save.sims[Math.random() < .5 ? 0 : 1] : null) || save.sims[0];
     kids.push({ name: nm, born: save.day, hap: 85, look: { body, skin: par.skin, hairStyle: body === "f" ? "ponytail" : "short", hairColor: par.hairColor, shirt: ri(CLOTH.length), pants: ri(PANTS.length), eye: par.eye, beard: "none", bottom: "pants" } });
     save.mood = Math.min(100, save.mood + 25); addDiamonds(3, "aile büyüdü"); writeSave(); SND.play("fanfare"); closeOverlay(); setTimeout(questTick, 100);
     cine("AİLE BÜYÜYOR", `${nm} dünyaya geldi! 👶`, "Ona iyi bakın: beslemek, oynamak ve ninni her gün mutluluğunu artırır.", () => { spawnKids(); showFamily(); }, 2800); confettiHearts(cam.target.x, 2, cam.target.z); });
@@ -11324,7 +11627,7 @@ function showTestMenu(){
   on("tMap", () => enterTest(5, "mansion", () => showMap(showTestMenu)));
   on("tDia", () => enterTest(5, "mansion", () => showDiamondShop(showTestMenu)));
   on("tWheel", () => enterTest(5, "mansion", () => showWheel(showTestMenu)));
-  on("tAward", () => enterTest(5, "mansion", () => { closeOverlay(); save.shifts = 8; save.awardAt = 0; maybeAwards(() => showTestMenu()); }));
+  on("tAward", () => enterTest(5, "mansion", () => { closeOverlay(); save.shifts = 10; save.awardAt = 0; maybeAwards(() => showTestMenu()); }));
   on("tCap", () => enterTest(5, "mansion", () => { goHome(); setTimeout(() => showHolding("co"), 300); }));
   on("tPhone", () => enterTest(5, "mansion", () => { goHome(); setTimeout(showPhone, 300); }));
   on("tNews", () => enterTest(5, "mansion", () => showNewspaper({ head: "COUPLE'S BURGER DÜNYA DEVİ OLDU!", sub: "Test modundan son dakika", body: "İstanbul, New York, Tokyo ve Paris şubeleri rekor kırdı.", tag: "TEST" }, showTestMenu)));
@@ -11378,6 +11681,7 @@ const ptrs = new Map(); let pinch0 = 0, r0 = 0, tapStart = null;
 const cv = renderer.domElement;
 cv.addEventListener("pointerdown", e => {
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); cv.setPointerCapture(e.pointerId);
+  if (ptrs.size === 1 && (officeEdPtr("down", e.clientX, e.clientY) || editPtr("down", e.clientX, e.clientY))){ tapStart = null; return; }
   tapStart = ptrs.size === 1 ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
   if (ptrs.size === 2){ const [a, b] = [...ptrs.values()]; pinch0 = Math.hypot(a.x - b.x, a.y - b.y); r0 = cam.r; }
 });
@@ -11385,16 +11689,18 @@ cv.addEventListener("pointermove", e => {
   const pr = ptrs.get(e.pointerId); if (!pr) return;
   const dx = e.clientX - pr.x, dy = e.clientY - pr.y; pr.x = e.clientX; pr.y = e.clientY;
   if (mode === "cas"){ casRot += dx * .012; return; }
+  if (ptrs.size === 1 && (officeEdPtr("move", e.clientX, e.clientY) || editPtr("move", e.clientX, e.clientY))) return;
   if (ptrs.size === 1){ cam.az -= dx * .006; cam.polar = clamp(cam.polar - dy * .004, .55, 1.25); }
-  else if (ptrs.size === 2){ const [a, b] = [...ptrs.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y); if (pinch0) cam.r = clamp(r0 * pinch0 / d, 7, 50); }
+  else if (ptrs.size === 2){ const [a, b] = [...ptrs.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y); if (pinch0) cam.r = clamp(r0 * pinch0 / d, 7, camMaxR()); }
 });
 const endPtr = e => {
+  if (officeEdPtr("up", e.clientX, e.clientY) || editPtr("up", e.clientX, e.clientY)){ tapStart = null; ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch0 = 0; return; }
   if (tapStart && ptrs.size === 1 && Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y) < 8 && performance.now() - tapStart.t < 350) tapFloor(e.clientX, e.clientY);
   tapStart = null;
   ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch0 = 0;
 };
 cv.addEventListener("pointerup", endPtr); cv.addEventListener("pointercancel", e => { tapStart = null; ptrs.delete(e.pointerId); });
-cv.addEventListener("wheel", e => { e.preventDefault(); if (mode === "game" || mode === "home") cam.r = clamp(cam.r * (1 + e.deltaY * .001), 7, 50); }, { passive: false });
+cv.addEventListener("wheel", e => { e.preventDefault(); if (mode === "game" || mode === "home") cam.r = clamp(cam.r * (1 + e.deltaY * .001), 7, camMaxR()); }, { passive: false });
 
 /* =====================================================================
    OYUN KOLU (PS / Xbox / Bluetooth) + TV KUMANDASI + MENÜDE YÖN TUŞLARIYLA GEZİNME
@@ -12146,7 +12452,7 @@ const NET = (() => {
         if (edge(2) || edge(4) || edge(5)) N.btn("give");
         if (edge(9) || edge(8)) showGuestMenu();
         cam.az -= ax(2) * dt * 2.2; cam.polar = clamp(cam.polar + ax(3) * dt * 1.2, .55, 1.25);
-        if (pr(6)) cam.r = Math.min(50, cam.r + dt * 10);
+        if (pr(6)) cam.r = Math.min(camMaxR(), cam.r + dt * 10);
         if (pr(7)) cam.r = Math.max(7, cam.r - dt * 10);
         G.pad = gp.buttons.map(b => b.pressed);
       }
@@ -12189,8 +12495,9 @@ const NET = (() => {
       if (camFollow && me && V && V.cam){
         const x = me.group.position.x, z = me.group.position.z, kk = Math.min(1, dt * 3);
         cam.target.x = lerp(cam.target.x, V.cam.x + clamp(x - V.cam.x, -4.5, 4.5) * .8, kk);
-        cam.target.z = lerp(cam.target.z, V.cam.z + clamp(z - V.cam.z, -3, 3) * .45, kk);
+        cam.target.z = lerp(cam.target.z, V.cam.z + clamp(z - V.cam.z, -camZR(), camZR()) * .45, kk);
       }
+      try { terraceTick(); } catch(e){}
       applyCamera(); updateFacade(); updateOccluders(dt);
       G.lab.forEach(el => { if (el._v && el._w) place(el, el._w[0], el._w[1], el._w[2]); else el.style.display = "none"; });
     }
