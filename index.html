@@ -12109,7 +12109,8 @@ const NET = (() => {
     else if (m.t === "hello"){
       try { svT = 8; } catch(e){}          // misafir yeni bağlandı: önce sahne gitsin, kayıt kopyası sonra
       const o = m.sim;
-      if (o && typeof o === "object"){
+      if (m.bv !== NET_BUILD) setTimeout(() => flash("⚠️ Arkadaşın oyunun farklı bir sürümünde: ikiniz de sayfayı kapatıp yeniden açın", "#e9555b"), 1500);
+      if (o && typeof o === "object" && !N.keepSim){
         const role = (save.sims[1] && save.sims[1].role) || "manager";
         save.sims[1] = Object.assign({}, DEFAULT_SIMS[1], o, { role, name: String(o.name || "Oyuncu 2").slice(0, 16) });
         writeSave();
@@ -12311,7 +12312,7 @@ const NET = (() => {
   N.forceRelay = qs.get("relay") === "1";
   function guestOpened(){
     clearInterval(N.resend);
-    N.send({ t: "hello", sim: (typeof netMe === "function" && netMe()) || (previewBackup ? previewBackup.sims[0] : save.sims[0]) });
+    N.send({ t: "hello", bv: NET_BUILD, sim: (typeof netMe === "function" && netMe()) || (previewBackup ? previewBackup.sims[0] : save.sims[0]) });
     if (N.cb.connected) N.cb.connected();
   }
   function guestEnd(msg, err){
@@ -12604,6 +12605,9 @@ const NET = (() => {
 })();
 
 /* ---------- Online menüsü ---------- */
+const NET_BUILD = 36;   // online sürüm uyumu kontrolü
+/* oda kodu: Türkçe klavyede gelen İ/ı/Ö/Ü/Ş/Ç/Ğ harfleri düzeltilir, boşluklar atılır */
+const normCode = v => String(v || "").replace(/[İıi]/g, "I").replace(/[Öö0]/g, "O").replace(/[Üü]/g, "U").replace(/[Şş]/g, "S").replace(/[Çç]/g, "C").replace(/[Ğğ]/g, "G").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);   // online sürüm uyumu kontrolü
 function showNetMenu(){
   const me = netMe();
   if (!me){ editNetProfile(); return; }          // ilk kez: önce karakterini tasarla ve adını yaz
@@ -12617,25 +12621,31 @@ function showNetMenu(){
   on("nBack", showMenu);
   on("nEdit", () => editNetProfile());
   on("nHost", hostRoom);
-  overlay.querySelectorAll("[data-nhost]").forEach(b => b.onclick = () => { const x = slotIndex().find(s => s.id === b.dataset.nhost); flash(`🏠 Oda kuruluyor: ${x && x.names[1] ? x.names[1] + " katılınca kayıtlı oyununuz açılır" : "arkadaşın katılınca kayıt açılır"}`, "#43c06a"); hostRoom(); });
+  overlay.querySelectorAll("[data-nhost]").forEach(b => { const go = () => hostRoom(b.dataset.nhost); b.onclick = go; const row = b.closest(".slot"); if (row){ row.style.cursor = "pointer"; row.onclick = e => { if (!e.target.closest("button")) go(); }; } });
   const inp = document.getElementById("nCode");
-  inp.addEventListener("input", () => { inp.value = inp.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4); });
+  inp.addEventListener("input", () => { inp.value = normCode(inp.value); });
   inp.addEventListener("keydown", e => { if (e.key === "Enter") joinRoom(inp.value); });
   on("nJoin", () => joinRoom(inp.value));
 }
+let lastJoinCode = "";
 function netFail(e){
-  modal(`<h2>⚠️ Bağlanamadı</h2><p>${NET.errText(e)}</p><div class="btns"><button id="nfRetry">↻ Tekrar dene</button><button class="sec" id="nfMenu">Menü</button></div>`);
-  on("nfRetry", showNetMenu); on("nfMenu", showMenu);
+  const rtc = !!(window.RTCPeerConnection && window.WebSocket);
+  modal(`<h2>⚠️ Bağlanamadı</h2><p>${NET.errText(e)}</p>
+    <div class="tipbox">📱 <b>Tablet / Android için:</b><br>• Oyunu <b>Chrome</b> ile açın (Samsung İnternet ya da uygulama içi tarayıcılar sorun çıkarabilir) ve Chrome'u Play Store'dan güncelleyin.<br>• İki cihazda da sayfayı tamamen kapatıp yeniden açın: ikinizde de oyunun <b>son sürümü</b> olmalı.<br>• Kodu ev sahibinin ekranındaki gibi 4 harf yazın.<br>• Olmazsa aşağıdaki <b>🛰 Sunucu üzerinden bağlan</b> ile deneyin (biraz daha yavaş ama her ağda çalışır).${rtc ? "" : "<br>⚠️ <b>Bu tarayıcı online oyunu desteklemiyor</b>: Chrome ile açın."}</div>
+    <div class="btns"><button class="sec" id="nfMenu">Menü</button><button class="sec" id="nfRetry">↻ Tekrar dene</button>${lastJoinCode && rtc ? `<button id="nfRelay">🛰 Sunucu üzerinden bağlan</button>` : ""}</div>`);
+  on("nfRetry", () => { NET.forceRelay = false; if (lastJoinCode) joinRoom(lastJoinCode); else showNetMenu(); }); on("nfMenu", showMenu);
+  on("nfRelay", () => { NET.forceRelay = true; joinRoom(lastJoinCode); });
 }
 const netSlug = n => "net-" + String(n || "arkadas").toLocaleLowerCase("tr-TR").replace(/[^a-z0-9çğıöşü]+/g, "-").slice(0, 20);
-function hostRoom(){
+function hostRoom(slotId){
   SND.init();
-  const me = clone(netMe() || save.sims[0]);
+  const me = clone(netMe() || save.sims[0]), fixed = slotId && slotIndex().find(x => x.id === slotId);
+  NET.keepSim = !!fixed;
   useTempSlot();
   modal(`<h2>🏠 Oda kuruluyor…</h2><p>Sunucuya bağlanılıyor…</p><p class="diag" id="netDiag"></p>`);
   NET.host({
     ready(code){
-      modal(`<h2>🏠 Oda hazır</h2><p>Arkadaşın kendi telefonunda <b>Online oyna → Katıl</b> ekranına bu kodu yazsın:</p>
+      modal(`<h2>🏠 Oda hazır</h2>${fixed ? `<p class="tipbox">💾 Kayıtlı oyun: <b>${escapeHtml(fixed.names.join(" & "))}</b> · ${slotLine(fixed)}<br>Kim katılırsa katılsın bu kayıt açılır (isim aynı olmak zorunda değil).</p>` : ""}<p>Arkadaşın kendi cihazında <b>Online oyna → Katıl</b> ekranına bu kodu yazsın:</p>
         <div class="bigcode">${code}</div><p style="text-align:center">⏳ Bekleniyor…</p><p class="diag" id="netDiag"></p>
         <div class="btns"><button class="sec" id="nhCancel">✕ Odayı kapat</button></div>`);
       on("nhCancel", () => { NET.close(); showMenu(); });
@@ -12645,12 +12655,14 @@ function hostRoom(){
     joined(name){
       NET.cb.joined = null;
       const gsim = clone(save.sims[1]);
-      useSlot(netSlug(name), "net", ns => { ns.sims[0] = clone(me); });
-      save.sims[0] = Object.assign({}, save.sims[0], me, { role: save.sims[0].role || me.role || "chef" });
-      save.sims[1] = Object.assign({}, save.sims[1], gsim, { role: save.sims[1].role || "manager" });
+      useSlot(fixed ? fixed.id : netSlug(name), "net", ns => { ns.sims[0] = clone(me); });
+      if (!fixed){   // isimle eşleşen kayıt: karakterler profillerden güncellenir; seçilen kayıtta kayıttaki karakterler korunur
+        save.sims[0] = Object.assign({}, save.sims[0], me, { role: save.sims[0].role || me.role || "chef" });
+        save.sims[1] = Object.assign({}, save.sims[1], gsim, { role: save.sims[1].role || "manager" }); }
+      NET.guestName = save.sims[1].name;
       writeSave();
       const resumed = save.shifts > 0 || save.level > 1;
-      modal(`<h2>✅ ${escapeHtml(name)} bağlandı!</h2><p>Oda kodu: <b>${NET.code}</b>. ${resumed ? `<b>Ortak kaydınız bulundu:</b> ${slotLine(save)} — kaldığınız yerden devam ediyorsunuz.` : "Yeni ortak kayıt açıldı."} Oyunu sen yönetiyorsun; arkadaşın izler ve oynar.</p>
+      modal(`<h2>✅ ${escapeHtml(fixed ? save.sims[1].name : name)} bağlandı!</h2><p>Oda kodu: <b>${NET.code}</b>. ${resumed ? `<b>Ortak kaydınız bulundu:</b> ${slotLine(save)} — kaldığınız yerden devam ediyorsunuz.` : "Yeni ortak kayıt açıldı."} Oyunu sen yönetiyorsun; arkadaşın izler ve oynar.</p>
         <div class="btns"><button id="nhGo">▶ Birlikte başla</button><button class="sec" id="nhMenu">Menü</button></div>`);
       on("nhGo", () => beginGame(2));
       on("nhMenu", showMenu);
@@ -12659,8 +12671,9 @@ function hostRoom(){
   });
 }
 function joinRoom(code){
-  code = String(code || "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);
+  code = normCode(code);
   if (code.length !== 4){ flash("4 harfli oda kodunu yaz", "#e9555b"); return; }
+  lastJoinCode = code;
   SND.init();
   modal(`<h2>🔗 Odaya katılınıyor…</h2><div class="bigcode">${code}</div><p>Bağlanılıyor… (10-15 saniye sürebilir)</p><p class="diag" id="netDiag"></p><div class="btns"><button class="sec" id="njCancel">✕ Vazgeç</button></div>`);
   on("njCancel", () => { NET.leave(); });
