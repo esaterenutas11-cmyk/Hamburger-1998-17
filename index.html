@@ -1180,6 +1180,8 @@
   .acct-card img,.acct-card i{width:52px;height:52px;border-radius:50%;border:2px solid var(--pop-ink);font-style:normal;font-size:30px;display:grid;place-items:center;flex:none}
   .acct-card b{font-family:var(--head);font-size:17px;display:block}.acct-card small{display:block;font-size:12px;color:#555;font-weight:700}
   .act-grid .t-google{display:flex;align-items:center;justify-content:center;gap:8px;background:#fff}
+  .ttl-btns .t-small{font-size:15px!important;padding:8px 12px 6px!important}
+  .ttl-btns .lg-ph{width:30px;height:30px;border-radius:50%;border:2px solid var(--pop-ink);flex:none}
 </style>
 
 </head>
@@ -13735,7 +13737,7 @@ const NET = (() => {
 })();
 
 /* ---------- Online menüsü ---------- */
-const NET_BUILD = 48;   // online sürüm uyumu kontrolü
+const NET_BUILD = 49;   // online sürüm uyumu kontrolü
 /* oda kodu: Türkçe klavyede gelen İ/ı/Ö/Ü/Ş/Ç/Ğ harfleri düzeltilir, boşluklar atılır */
 const normCode = v => String(v || "").replace(/[İıi]/g, "I").replace(/[Öö0]/g, "O").replace(/[Üü]/g, "U").replace(/[Şş]/g, "S").replace(/[Çç]/g, "C").replace(/[Ğğ]/g, "G").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);   // online sürüm uyumu kontrolü
 function showNetMenu(){
@@ -13852,13 +13854,18 @@ const gLogo = `<svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true
 function showLogin(after){
   modal(`<div class="ttl-logo"><img class="ttl-img" src="${LOGO_MENU_URI}" alt="Couple's Burger Life"><div class="ttl-1">COUPLE'S</div><div class="ttl-2">BURGER<br>LIFE</div><div class="ttl-rib">COOKING</div></div>
     <div class="ttl-btns login-btns">
-      <button class="t-google" id="lgGoogle">${gLogo}<span class="tb-t">GOOGLE İLE GİRİŞ<small>Kayıtların buluta yedeklenir, her cihazda devam</small></span></button>
+      ${(() => { const A = authInfo(); return A && A.mode === "google" ? `<button class="t-google" id="lgCont">${A.photo ? `<img class="lg-ph" src="${escapeHtml(A.photo)}" alt="" referrerpolicy="no-referrer">` : gLogo}<span class="tb-t">${escapeHtml((A.name || "Google").toLocaleUpperCase("tr-TR"))} OLARAK DEVAM<small>${escapeHtml(A.email || "")} · kayıtlar bulutta</small></span></button>` : ""; })()}
+      <button class="t-google${authInfo() && authInfo().mode === "google" ? " t-small" : ""}" id="lgGoogle">${gLogo}<span class="tb-t">${authInfo() && authInfo().mode === "google" ? "BAŞKA GOOGLE HESABI" : "GOOGLE İLE GİRİŞ"}<small>Kayıtların buluta yedeklenir, her cihazda devam</small></span></button>
       <button class="t-guest" id="lgGuest">${pic("play")}<span class="tb-t">MİSAFİR GİRİŞİ<small>Hesapsız: kayıt sadece bu cihazda</small></span></button>
     </div>
     <p class="ttl-ver" id="lgMsg">Sonradan ⚙️ Ayarlar › Hesap'tan Google'a bağlanabilirsin.</p>`);
   overlay.firstElementChild.classList.add("title", "login"); overlay.classList.add("title-ov");
   on("lgGuest", () => { prefs.auth = { mode: "guest", t: Date.now() }; writePrefs(); SND.play("tick"); (after || showMenu)(); });
   on("lgGoogle", () => googleSignIn(after));
+  on("lgCont", () => { SND.play("tick"); const go = () => (after || showMenu)();
+    if (AUTH.user){ go(); return; }
+    const m = document.getElementById("lgMsg"); if (m) m.textContent = "⏳ Oturum açılıyor…";
+    fbLoad().then(() => waitUser()).then(() => { cloudPull(true, after); }).catch(() => { if (m) m.innerHTML = "⚠️ Oturum bulunamadı ya da internet yok. Google ile tekrar giriş yap ya da misafir oyna."; }); });
 }
 function googleSignIn(after){
   const msg = t => { const el = document.getElementById("lgMsg"); if (el) el.innerHTML = t; else flash(t.replace(/<[^>]+>/g, ""), "#7C5CE0"); };
@@ -13947,9 +13954,9 @@ function authBoot(){
   let redir = false; try { redir = sessionStorage.getItem("bbRedir") === "1"; sessionStorage.removeItem("bbRedir"); } catch(e){}
   if (!a && redir){ showLogin(); const m = document.getElementById("lgMsg"); if (m) m.textContent = "⏳ Google girişi tamamlanıyor…";
     fbLoad().then(fb => fb.auth().getRedirectResult()).then(r => { if (r && r.user){ authSetUser(r.user); cloudPull(true); } else if (m) m.textContent = "Giriş tamamlanamadı, tekrar dene ya da misafir oyna."; }).catch(() => { if (m) m.textContent = "⚠️ Giriş tamamlanamadı."; }); return; }
-  if (!a){ showLogin(); return; }
-  showMenu();
-  if (a.mode === "google") fbLoad().then(fb => fb.auth().getRedirectResult().then(r => { if (r && r.user){ authSetUser(r.user); cloudPull(true); } }).catch(() => {}))
+  if (a && a.auto){ showMenu(); return; }                  // sadece otomatik testler
+  showLogin();                                             // her açılışta sor
+  if (a && a.mode === "google") fbLoad().then(fb => fb.auth().getRedirectResult().then(r => { if (r && r.user){ authSetUser(r.user); cloudPull(true); } }).catch(() => {}))
     .then(() => waitUser()).then(() => { if (Date.now() - (prefs.cloudT || 0) > 3600e3) cloudPush(false); }).catch(e => console.warn("oturum", e));
 }
 addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && AUTH.user && Date.now() - AUTH.lastPush > 30000) cloudPush(false); });
