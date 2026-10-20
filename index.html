@@ -12957,15 +12957,15 @@ const NET = (() => {
   N.rcode = () => { let s = ""; for (let k = 0; k < 4; k++) s += CODE_A[Math.random() * CODE_A.length | 0]; return s; };
 
   /* ---------- tanı satırı (Sunucu 1 / Sunucu 2 / Teklif / Cevap / Bağlantı) ---------- */
-  const DG = { pj: "…", nt: "…", of: "", an: "", ice: "", me: "", them: "" };
+  const DG = { pj: "…", nt: "…", fb: "…", of: "", an: "", ice: "", me: "", them: "" };
   function diag(k, v){
     DG[k] = v;
     const el = document.getElementById("netDiag");
-    if (el) el.innerHTML = `Sunucu 1: ${DG.pj}  ·  Sunucu 2: ${DG.nt}` + (DG.of ? `  ·  Teklif: ${DG.of}` : "") + (DG.an ? `  ·  Cevap: ${DG.an}` : "") + (DG.ice ? `  ·  Bağlantı: ${DG.ice}` : "") +
+    if (el) el.innerHTML = `Sunucu 1: ${DG.pj}  ·  Sunucu 2: ${DG.nt}  ·  Sunucu 3: ${DG.fb}` + (DG.of ? `  ·  Teklif: ${DG.of}` : "") + (DG.an ? `  ·  Cevap: ${DG.an}` : "") + (DG.ice ? `  ·  Bağlantı: ${DG.ice}` : "") +
       (DG.me ? `<br>Bu cihaz: ${DG.me}` : "") + (DG.them ? `<br>Karşı cihaz: ${DG.them}` : "");
   }
   N.diagRefresh = () => diag("pj", DG.pj);
-  function diagReset(){ DG.pj = DG.nt = "…"; DG.of = DG.an = DG.ice = DG.me = DG.them = ""; }
+  function diagReset(){ DG.pj = DG.nt = DG.fb = "…"; DG.of = DG.an = DG.ice = DG.me = DG.them = ""; }
   function routes(sdp){
     const c = (sdp || "").match(/^a=candidate:.*$/gm) || [];
     const host = c.filter(l => / typ host/.test(l)).length, srflx = c.filter(l => / typ srflx/.test(l)).length, relay = c.filter(l => / typ relay/.test(l)).length;
@@ -12991,9 +12991,9 @@ const NET = (() => {
   /* ---------- eşleştirme: PeerJS + ntfy.sh paralel, tekrarlar elenir ---------- */
   function signal(id){
     return new Promise((res, rej) => {
-      const S = { id, handlers: {}, seen: new Set(), pj: null, nt: null, pjOk: false, ntOk: false, done: false };
+      const S = { id, handlers: {}, seen: new Set(), pj: null, nt: null, fb: null, pjOk: false, ntOk: false, done: false, rseen: new Set() };
       const deliver = m => {
-        if (m.payload && typeof m.payload.r === "string"){ S.onRelay && S.onRelay(m.src, m.payload.r); return; }
+        if (m.payload && typeof m.payload.r === "string"){ const k = m.payload.k; if (k){ if (S.rseen.has(k)) return; S.rseen.add(k); if (S.rseen.size > 3000) S.rseen = new Set(); } S.onRelay && S.onRelay(m.src, m.payload.r); return; }
         const mid = m.payload && m.payload.mid; if (mid && S.seen.has(mid)) return;
         const h = S.handlers[m.type]; if (h && h(m) !== false && mid) S.seen.add(mid);
       };
@@ -13002,9 +13002,15 @@ const NET = (() => {
         payload = Object.assign({ mid: rid() }, payload);
         try { S.pj && S.pj.readyState === 1 && S.pj.send(JSON.stringify({ type, dst, payload })); } catch(e){}
         if (S.ntOk) zpack(JSON.stringify({ type, src: id, dst, payload })).then(body => fetch(NTFY.http + "/" + NTFY.pre + dst, { method: "POST", body })).catch(() => {});
+        if (S.fb) S.fb.send(dst, { type, src: id, dst, payload });
       };
-      S.raw = (dst, data) => { try { if (S.pj && S.pj.readyState === 1){ S.pj.send(JSON.stringify({ type: "CANDIDATE", dst, payload: { r: data } })); return true; } } catch(e){} return false; };
-      S.close = () => { clearInterval(S.hb); try { S.pj && S.pj.close(); } catch(e){} try { S.nt && S.nt.close(); } catch(e){} };
+      // veri aktarımı: Firebase (Wi-Fi ↔ mobil veri dahil her ağda çalışır) varsa o, yoksa PeerJS
+      // iki yoldan birden yollanır (karşı tarafta hangisi açıksa o ulaşır), tekrarlar "k" ile elenir
+      S.raw = (dst, data) => { const k = rid(); let ok = false;
+        try { if (S.fb){ S.fb.send(dst, { type: "CANDIDATE", src: id, dst, payload: { r: data, k } }); ok = true; } } catch(e){}
+        try { if (S.pj && S.pj.readyState === 1){ S.pj.send(JSON.stringify({ type: "CANDIDATE", dst, payload: { r: data, k } })); ok = true; } } catch(e){}
+        return ok; };
+      S.close = () => { clearInterval(S.hb); try { S.pj && S.pj.close(); } catch(e){} try { S.nt && S.nt.close(); } catch(e){} try { S.fb && S.fb.close(); } catch(e){} S.fb = null; S.closedAll = true; };
       const to = setTimeout(() => { if (!S.done){ S.done = true; S.close(); rej("ws"); } }, 12000);
       try {
         const pj = new WebSocket(`${SIG}&id=${encodeURIComponent(id)}&token=${rid()}&version=1.5.4`); S.pj = pj;
@@ -13017,6 +13023,8 @@ const NET = (() => {
         };
         pj.onerror = () => diag("pj", "✖"); pj.onclose = () => { S.pjOk = false; };
       } catch(e){ diag("pj", "✖"); }
+      if (typeof fbNet === "function" && qs.get("fb") !== "0") fbNet(id, m => { if (!S.closedAll) deliver(m); }).then(f => { if (S.closedAll){ f.close(); return; } S.fb = f; diag("fb", "✔"); ready(); }).catch(e => { console.warn("rtdb", e); diag("fb", "✖"); });
+      else diag("fb", "—");
       if (NTFY.on) try {
         const nt = new WebSocket(NTFY.ws + "/" + NTFY.pre + id + "/ws"); S.nt = nt;
         nt.onmessage = e => {
@@ -13737,7 +13745,7 @@ const NET = (() => {
 })();
 
 /* ---------- Online menüsü ---------- */
-const NET_BUILD = 49;   // online sürüm uyumu kontrolü
+const NET_BUILD = 50;   // online sürüm uyumu kontrolü
 /* oda kodu: Türkçe klavyede gelen İ/ı/Ö/Ü/Ş/Ç/Ğ harfleri düzeltilir, boşluklar atılır */
 const normCode = v => String(v || "").replace(/[İıi]/g, "I").replace(/[Öö0]/g, "O").replace(/[Üü]/g, "U").replace(/[Şş]/g, "S").replace(/[Çç]/g, "C").replace(/[Ğğ]/g, "G").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);   // online sürüm uyumu kontrolü
 function showNetMenu(){
@@ -13828,8 +13836,28 @@ const FB_CFG = {
   storageBucket: "couple-s-burger-life.firebasestorage.app",
   messagingSenderId: "13664019864",
   appId: "1:13664019864:web:6a2c667be70b6b5b6437ed",
-  measurementId: "G-2KSSDXN332"
+  measurementId: "G-2KSSDXN332",
+  databaseURL: "https://couple-s-burger-life-default-rtdb.firebaseio.com"
 };
+/* online oyun için: Realtime Database (eşleştirme + doğrudan bağlantı kurulamazsa veri aktarımı).
+   Wi-Fi ↔ mobil veri gibi doğrudan bağlanamayan ağlarda oyun verisi bu yoldan akar. */
+let _fbDb = null;
+function fbDb(){
+  if (_fbDb) return _fbDb;
+  const base = `https://www.gstatic.com/firebasejs/${FB_V}/`;
+  _fbDb = (window.firebase && window.firebase.apps ? Promise.resolve() : loadScript(base + "firebase-app-compat.js"))
+    .then(() => window.firebase.database ? null : loadScript(base + "firebase-database-compat.js"))
+    .then(() => { const fb = window.firebase; if (!fb.apps.length) fb.initializeApp(FB_CFG); return fb.database(); })
+    .catch(e => { _fbDb = null; throw e; });
+  return _fbDb;
+}
+async function fbNet(id, onMsg){
+  const db = await fbDb(), fb = window.firebase, ref = db.ref("net/" + id);
+  await Promise.race([ref.remove(), new Promise((_, rej) => setTimeout(() => rej(new Error("rtdb zaman aşımı")), 6000))]);
+  try { ref.onDisconnect().remove(); } catch(e){}
+  ref.on("child_added", snap => { const v = snap.val(); snap.ref.remove().catch(() => {}); if (!v || typeof v.j !== "string") return; let m; try { m = JSON.parse(v.j); } catch(e){ return; } onMsg(m); });
+  return { send: (dst, m) => { try { db.ref("net/" + dst).push({ j: JSON.stringify(m), t: fb.database.ServerValue.TIMESTAMP }); } catch(e){} }, close: () => { try { ref.off(); ref.remove().catch(() => {}); } catch(e){} } };
+}
 const FB_V = "10.12.2";
 const AUTH = { fb: null, user: null, loading: null, pushT: null, busy: false, lastPush: 0 };
 const authInfo = () => prefs.auth || null;
@@ -13860,6 +13888,7 @@ function showLogin(after){
     </div>
     <p class="ttl-ver" id="lgMsg">Sonradan ⚙️ Ayarlar › Hesap'tan Google'a bağlanabilirsin.</p>`);
   overlay.firstElementChild.classList.add("title", "login"); overlay.classList.add("title-ov");
+  fbLoad().catch(() => {});            // dokununca bekletmeden açılsın diye şimdiden yükle
   on("lgGuest", () => { prefs.auth = { mode: "guest", t: Date.now() }; writePrefs(); SND.play("tick"); (after || showMenu)(); });
   on("lgGoogle", () => googleSignIn(after));
   on("lgCont", () => { SND.play("tick"); const go = () => (after || showMenu)();
@@ -13869,9 +13898,13 @@ function showLogin(after){
 }
 function googleSignIn(after){
   const msg = t => { const el = document.getElementById("lgMsg"); if (el) el.innerHTML = t; else flash(t.replace(/<[^>]+>/g, ""), "#7C5CE0"); };
-  if (AUTH.busy) return; AUTH.busy = true; msg("⏳ Google'a bağlanılıyor…");
-  fbLoad().then(fb => { const prov = new fb.auth.GoogleAuthProvider(); prov.setCustomParameters({ prompt: "select_account" });
-      return fb.auth().signInWithPopup(prov).catch(e => { if (["auth/popup-blocked", "auth/operation-not-supported-in-this-environment", "auth/cancelled-popup-request"].includes(e.code)){ msg("↪️ Google sayfasına yönlendiriliyorsun…"); try { sessionStorage.setItem("bbRedir", "1"); } catch(_){} return fb.auth().signInWithRedirect(prov).then(() => null); } throw e; }); })
+  if (AUTH.busy) return;
+  // iPhone Safari: Google penceresi ancak dokunuşun hemen içinde açılırsa açılır → Firebase önceden yüklenmiş olmalı
+  if (!AUTH.fb){ msg("⏳ Google hazırlanıyor… 1-2 saniye sonra <b>tekrar dokun</b>."); fbLoad().then(() => msg("✅ Hazır: şimdi <b>Google ile giriş</b>'e tekrar dokun.")).catch(() => msg("⚠️ Google'a ulaşılamadı (internet?). İstersen misafir olarak oyna.")); return; }
+  AUTH.busy = true; msg("⏳ Google'a bağlanılıyor…");
+  const fb = AUTH.fb, prov = new fb.auth.GoogleAuthProvider(); prov.setCustomParameters({ prompt: "select_account" });
+  let pop; try { pop = fb.auth().signInWithPopup(prov); } catch(e){ pop = Promise.reject(e); }            // dokunuşun içinde, beklemeden
+  Promise.resolve().then(() => { return pop.catch(e => { if (["auth/popup-blocked", "auth/operation-not-supported-in-this-environment", "auth/cancelled-popup-request"].includes(e.code)){ msg("↪️ Google sayfasına yönlendiriliyorsun…"); try { sessionStorage.setItem("bbRedir", "1"); } catch(_){} return fb.auth().signInWithRedirect(prov).then(() => null); } throw e; }); })
     .then(r => { AUTH.busy = false; if (!r || !r.user) return; authSetUser(r.user); SND.play("levelup"); flash(`✅ Hoş geldin ${prefs.auth.name}!`, "#43c06a"); cloudPull(true, after); })
     .catch(e => { AUTH.busy = false; console.warn("google giriş", e);
       const why = e && e.code === "auth/unauthorized-domain" ? "Bu adres Firebase'de izinli değil (Authorized domains)." : e && e.code === "auth/popup-closed-by-user" ? "Giriş penceresi kapatıldı." : e && e.code === "auth/network-request-failed" ? "İnternet bağlantısı yok." : e && e.code === "auth/operation-not-allowed" ? "Firebase'de Google girişi açık değil." : "Giriş yapılamadı" + (e && e.code ? " (" + e.code + ")" : "") + ".";
@@ -13939,6 +13972,7 @@ function showAccount(back){
       <div class="act-grid"><button class="t-google" id="acGoogle">${gLogo} Google ile bağlan</button></div><p class="small" id="lgMsg"></p>`}
     <div class="btns"><button class="sec" id="acB">← Geri</button></div>`);
   on("acB", () => back ? back() : showMenu());
+  if (!g) fbLoad().catch(() => {});
   on("acGoogle", () => googleSignIn(() => showAccount(back)));
   on("acPush", () => fbLoad().then(() => waitUser()).then(() => cloudPush(true)).then(() => showAccount(back)));
   on("acPull", () => fbLoad().then(() => waitUser()).then(async () => { const d = await AUTH.fb.firestore().collection("users").doc(AUTH.user.uid).get(); if (!d.exists){ flash("Bulutta kayıt yok", "#e9555b"); return; } cloudApply(d.data()); }).catch(() => flash("⚠️ Buluta ulaşılamadı", "#e9555b")));
