@@ -1146,6 +1146,40 @@
   #coachOffer div{display:flex;gap:6px;flex-wrap:wrap}#coachOffer button{flex:1 1 auto;padding:8px 8px 6px;font-size:14px;box-shadow:3px 3px 0 var(--pop-ink)}
   @keyframes coachIn{from{opacity:0;transform:translate(-50%,10px)}to{opacity:1;transform:translate(-50%,0)}}
   button.dim{opacity:.45}
+  /* ---------- ev düzenleme paneli ---------- */
+  #editBar{flex-direction:column;align-items:stretch;gap:7px;width:min(560px,calc(100vw - 16px));max-width:calc(100vw - 16px)!important;background:var(--pop-cream,#FFF8E7);border:3px solid var(--pop-ink);box-shadow:5px 6px 0 var(--pop-ink);padding:9px 10px!important;border-radius:16px}
+  #editBar .eb-h{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:14px}
+  #editBar .eb-h b{font-family:var(--head);letter-spacing:.4px;font-weight:400}
+  #editBar .eb-h span{font-size:12px;color:#555;font-weight:700}
+  #editBar .eb-h em{font-style:normal;font-size:12px;font-weight:800;border-radius:8px;padding:2px 7px;border:2px solid var(--pop-ink)}
+  #editBar .eb-h em.ok{background:var(--pop-mint)} #editBar .eb-h em.no{background:#ffb3b3}
+  #editBar .eb-row{display:flex;gap:6px;flex-wrap:wrap}
+  #editBar .eb-row button{flex:1 1 auto;padding:9px 8px 7px!important;font-size:14px!important}
+  #editBar .eb-move button{font-size:20px!important;min-width:48px;padding:6px 0 4px!important}
+  #editBar .eb-list{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 6px;-webkit-overflow-scrolling:touch}
+  #editBar .eb-it{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:2px;width:74px;padding:6px 4px 5px!important;font-size:22px!important;line-height:1}
+  #editBar .eb-it small{font-family:var(--body);font-size:10px;font-weight:800;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:66px}
+  body.port.touchdev #editBar{bottom:calc(10px + env(safe-area-inset-bottom))}
+  body.land #editBar{max-width:min(560px,calc(100% - 300px))!important}
+  #editBar > *{min-width:0;max-width:100%;box-sizing:border-box}
+  #editBar .eb-list{width:100%}
+  #editBar .eb-row button{min-width:0;white-space:nowrap}
+  #editBar .eb-row:not(.eb-move) button{flex:1 1 40%}
+  #editBar span{color:#555}
+  #tut .th{display:flex;align-items:center;justify-content:space-between;gap:6px}
+  #tut .th .tbtns{display:flex;gap:5px;flex:none}
+  #tut .th button{padding:4px 8px 3px;font-size:12px;box-shadow:2px 2px 0 var(--pop-ink)}
+  /* ---------- giriş ekranı / hesap ---------- */
+  .ttl-btns .t-google{background:#fff}
+  .ttl-btns .t-guest{background:var(--pop-mint)}
+  .ttl-btns button svg{flex:none}
+  .modal.login .ttl-ver{max-width:320px;text-align:center;line-height:1.35}
+  .acct-chip{position:fixed;top:calc(10px + env(safe-area-inset-top));left:calc(10px + env(safe-area-inset-left));z-index:40;display:flex;align-items:center;gap:6px;padding:5px 10px 4px 5px;font-size:13px;border-radius:999px;background:#fff;box-shadow:3px 3px 0 var(--pop-ink)}
+  .acct-chip img{width:26px;height:26px;border-radius:50%;border:2px solid var(--pop-ink)}
+  .acct-card{display:flex;gap:12px;align-items:center;background:#fff;border:3px solid var(--pop-ink);border-radius:14px;padding:10px;margin:8px 0 12px;box-shadow:3px 4px 0 var(--pop-ink)}
+  .acct-card img,.acct-card i{width:52px;height:52px;border-radius:50%;border:2px solid var(--pop-ink);font-style:normal;font-size:30px;display:grid;place-items:center;flex:none}
+  .acct-card b{font-family:var(--head);font-size:17px;display:block}.acct-card small{display:block;font-size:12px;color:#555;font-weight:700}
+  .act-grid .t-google{display:flex;align-items:center;justify-content:center;gap:8px;background:#fff}
 </style>
 
 </head>
@@ -1501,6 +1535,7 @@ function writeSave(){
   const kind = (save.slot && save.slot.kind) || "story";
   ix.unshift({ id: curSlot, kind, names: kind === "story" ? [save.sims[0].name] : [save.sims[0].name, save.sims[1].name], level: save.level, day: save.day, money: save.money, shifts: save.shifts, t: Date.now() });
   writeIndex(ix);
+  try { cloudSoon(); } catch(e){}
 }
 /* çift = yalnızca kadın + erkek. Aynı cinsiyetteki iki oyuncu arkadaş olarak başlar. */
 const diffSex = () => !!(save.sims[0] && save.sims[1]) && save.sims[0].body !== save.sims[1].body;
@@ -3319,7 +3354,30 @@ const HOME_LAYOUT2 = {
 const curFloor = () => (HOMES[save.home.type || "studio"].floors > 1 && save.home.floor === 2) ? 2 : 1;
 const onFloor = f => (f.fl || 1) === curFloor();
 const floorFurn = () => save.home.furniture.filter(onFloor);
-const homeLayout = () => (curFloor() === 2 ? HOME_LAYOUT2 : HOME_LAYOUT)[homeBase(save.home.type || "studio")] || { rooms: [], walls: [] };
+/* ev büyütme: her seviye +2 m en, +1 m derinlik; oda planı orantılı büyür (duvarlar dış duvara değmeye devam eder) */
+const HOME_EXT_MAX = 3;
+const homeExtLv = (t = save.home.type || "studio") => Math.min(HOME_EXT_MAX, ((save.home.ext || {})[t]) || 0);
+function applyHomeExt(){
+  Object.keys(HOMES).forEach(t => { const H = HOMES[t];
+    if (H.w0 == null){ H.w0 = H.w; H.d0 = H.d; H.st0 = H.stairs ? H.stairs.slice() : null; H.fl0 = H.floors || 1; }
+    const e = save && save.home ? homeExtLv(t) : 0; H.w = H.w0 + 2 * e; H.d = H.d0 + e;
+    const sx = H.w / H.w0, sz = H.d / H.d0;
+    H.stairs = H.st0 ? [Math.round(H.st0[0] * sx * 100) / 100, Math.round(H.st0[1] * sz * 100) / 100] : null; H.floors = H.fl0;
+  });
+}
+const _layoutCache = {};
+const homeLayout = () => {
+  const t0 = save.home.type || "studio", raw = (curFloor() === 2 ? HOME_LAYOUT2 : HOME_LAYOUT)[homeBase(t0)] || { rooms: [], walls: [] }, H = HOMES[t0];
+  const sx = H.w0 ? H.w / H.w0 : 1, sz = H.d0 ? H.d / H.d0 : 1; if (sx === 1 && sz === 1) return raw;
+  const key = t0 + ":" + curFloor() + ":" + sx + ":" + sz; if (_layoutCache[key]) return _layoutCache[key];
+  const R = v => Math.round(v * 100) / 100;
+  return (_layoutCache[key] = {
+    rooms: raw.rooms.map(r => Object.assign({}, r, { x0: R(r.x0 * sx), x1: R(r.x1 * sx), z0: R(r.z0 * sz), z1: R(r.z1 * sz) })),
+    walls: raw.walls.map(w => { const horiz = w.a[1] === w.b[1], k = horiz ? sx : sz;
+      // kapı boşluğu genişliği aynı kalır, sadece yeri kayar
+      return { a: [R(w.a[0] * sx), R(w.a[1] * sz)], b: [R(w.b[0] * sx), R(w.b[1] * sz)], doors: (w.doors || []).map(([d0, d1]) => { const c = (d0 + d1) / 2 * k, hw = (d1 - d0) / 2; return [R(c - hw), R(c + hw)]; }) }; })
+  });
+};
 /* bahçe ölçüsü: malikanenin bahçesi daha derin ve evden daha geniş */
 const gardenDepth = () => HOMES[save.home.type || "studio"].gD || 6.2;
 const gardenHalfW = () => { const H = HOMES[save.home.type || "studio"]; return H.w / 2 + (H.gW || 0); };
@@ -3637,6 +3695,7 @@ function stairsMesh(up){
   return g;
 }
 function buildHome(){
+  applyHomeExt();
   clearWorld();
   homeSpots = []; pet = null;
   const type0 = save.home.type || "studio", type = homeBase(type0), H = HOMES[type0], th = Object.assign({}, HOME_TH[type], { duplex: { low: 0x7a4a5a, paper: "#f6eef2", stripe: "#ecdde4" }, villa: { low: 0xc9a227, paper: "#fffaf0", stripe: "#f3e6c8" }, penthouse: { low: 0x1d1d22, trim: 0xc9a227, paper: "#f2f2f2", stripe: "#e2e2e2" }, island: { low: 0x2a7f9e, paper: "#f0fbff", stripe: "#d8f0f7" } }[type0] || {});
@@ -3952,6 +4011,57 @@ function homeScores(){
   return { comfort: c, decor: dc };
 }
 
+/* ---------- evi büyüt / kat çık ---------- */
+const homeKids = () => (save.kids || []).length;
+const homeExpandAvail = () => (save.home.type || "studio") !== "studio";        // stüdyoda gerek yok
+const homeExtPrice = lv => { const H = HOMES[save.home.type || "studio"]; return Math.round(Math.max(3000, (H.price || 0) * .12) * (lv + 1) / 100) * 100; };
+const STUDIO_UP_PRICE = 6000;
+function showHomeExpand(back){
+  const t = save.home.type || "studio", H = HOMES[t], lv = homeExtLv(t);
+  if (t === "studio"){ modal(`<h2>🏗️ Evi büyüt</h2><p>Stüdyo dairede büyütmeye gerek yok. Daha geniş bir yaşam için 🛒 Mağaza › 🏡 Ev'den bahçeli eve taşınabilirsin.</p><div class="btns"><button id="hxB">Tamam</button></div>`); on("hxB", () => back ? back() : closeOverlay()); return; }
+  const m2 = Math.round(H.w * H.d * (H.floors || 1)), nextP = homeExtPrice(lv), up = (save.home.extraFl || {})[t];
+  const upP = homeExtPrice(HOME_EXT_MAX + 1);
+  modal(`<h2>🏗️ Evi büyüt <span class="money">💵 $${fmt(save.money)}</span></h2>
+    <p>${escapeHtml(H.name)} · <b>${m2} m²</b> · ${H.floors || 1} kat · büyütme ${lv}/${HOME_EXT_MAX}</p>
+    <div class="cards">
+      <div class="card ${lv >= HOME_EXT_MAX ? "on" : ""}"><div class="ic">📐</div><b>Evi genişlet</b><small>Duvarlar dışarı alınır: her kat ve her oda büyür (+2 m en, +1 m derinlik). Eşyaların yerinde kalır.</small>
+        <div class="pr">${lv >= HOME_EXT_MAX ? "En büyük boyut" : "$" + fmt(nextP)}</div><button id="hxGrow" ${lv < HOME_EXT_MAX && save.money >= nextP ? "" : "disabled"}>${lv >= HOME_EXT_MAX ? "✓ Tamam" : save.money >= nextP ? "Genişlet" : "Para yetmiyor"}</button></div>
+      <div class="card ${up ? "on" : ""}"><div class="ic">🪜</div><b>Kat çık · çocuk odası</b><small>${up ? "Üst kattaki çocuk odası hazır." : "Üst kata çocuk odası kurulur (yatak, halı, kitaplık): çocuklar orada takılır."}</small>
+        <div class="pr">${up ? "Var" : "$" + fmt(upP)}</div><button id="hxUp" ${!up && save.money >= upP ? "" : "disabled"}>${up ? "✓ Yapıldı" : save.money >= upP ? "Kat çık" : "Para yetmiyor"}</button></div>
+    </div>
+    <p class="small">Büyüyen ev daha çok eşya alır; konfor ve dekor puanın artar.</p>
+    <div class="btns"><button class="sec" id="hxB">← Geri</button></div>`);
+  on("hxB", () => back ? back() : closeOverlay());
+  on("hxGrow", () => { if (save.money < nextP || lv >= HOME_EXT_MAX) return; save.money -= nextP; homeGrow(t, lv + 1); });
+  on("hxUp", () => { if (save.money < upP || up) return; save.money -= upP; (save.home.extraFl = save.home.extraFl || {})[t] = 1; kidRoomSetup(); writeSave(); closeOverlay(); SND.play("levelup");
+    cine("KAT ÇIKILDI", "Üst kata çocuk odası 🧸", "Merdivenden çık: çocuk odası ve oyun köşesi hazır.", () => goHome(true), 2400); });
+}
+function homeGrow(t, lv){
+  const H = HOMES[t], sx0 = H.w / H.w0, sz0 = H.d / H.d0;
+  (save.home.ext = save.home.ext || {})[t] = lv; applyHomeExt();
+  const sx = (H.w / H.w0) / sx0, sz = (H.d / H.d0) / sz0, fl0 = save.home.floor;
+  // eşyalar orantılı kayar; sığmayan olursa boş yer bulunur
+  [1, 2].forEach(fl => { save.home.floor = fl; const list = save.home.furniture.filter(f => (f.fl || 1) === fl);
+    list.forEach(f => { if (FURN[f.id] && FURN[f.id].garden){ f.x = Math.round(f.x * sx * 4) / 4; f.z = Math.round((f.z + (H.d - H.d / sz) / 2) * 4) / 4; } else { f.x = Math.round(f.x * sx * 4) / 4; f.z = Math.round(f.z * sz * 4) / 4; } });
+    list.forEach(f => { if (!canPlace(f, f.uid)){ const g = findFreeSpot(f.id, f, { ignore: f.uid }); if (g) Object.assign(f, { x: g.x, z: g.z, rot: g.rot }); } }); });
+  save.home.floor = fl0; writeSave(); closeOverlay(); SND.play("levelup");
+  cine("EV BÜYÜDÜ", `${HOMES[t].name}`, `Yeni boyut: ${Math.round(H.w * H.d * (H.floors || 1))} m² · eşyaların yerinde`, () => goHome(true), 2400);
+}
+
+/* üst katta (yoksa alt katta) ebeveyn yatağı olmayan bir yatak odasına çocuk odası kur */
+function kidRoomSetup(){
+  const H = HOMES[save.home.type || "studio"], fl0 = save.home.floor, fl = H.floors > 1 ? 2 : 1;
+  save.home.floor = fl;
+  const rooms = homeLayout().rooms.filter(r => r.k === "bed"), inR = (f, r) => (f.fl || 1) === fl && f.x > r.x0 && f.x < r.x1 && f.z > r.z0 && f.z < r.z1;
+  const r = rooms.find(r => !save.home.furniture.some(f => f.id === "bed_double" && inR(f, r))) || rooms[0];
+  if (r){ const c = { x: (r.x0 + r.x1) / 2, z: (r.z0 + r.z1) / 2 }, n = Math.max(1, Math.min(2, (save.kids || []).length));
+    const want = []; for (let i = 0; i < n; i++) want.push("bed_single"); want.push("rug", "shelf");
+    want.forEach(id => { if (id === "bed_single" && save.home.furniture.filter(f => f.id === "bed_single" && inR(f, r)).length >= n) return;
+      const g = findFreeSpot(id, c, {}); if (g && g.x > r.x0 - .1 && g.x < r.x1 + .1 && g.z > r.z0 - .1 && g.z < r.z1 + .1) save.home.furniture.push({ uid: newUid(), id, x: g.x, z: g.z, rot: g.rot, fl }); });
+  }
+  save.home.floor = fl0;
+}
+
 /* =====================================================================
    KAMERA (Sims tarzı: döndürülebilir, yakınlaştırılabilir)
    ===================================================================== */
@@ -4206,7 +4316,7 @@ function makeOrder(c){
   if (c) c.ordNo = ++ordSeq;     // fiş numarası: sipariş listesi bu sırayla durur (zıplamaz)
   const L = save.level, d = game.d, F = feat(L), r = Math.random();
   const B = () => ({ k: "burger", cheese: false, veg: false, sauce: false, sig: false, got: false });
-  if (game.tutorial) return [B(), { k: "cola", got: false }];
+  if (game.tutorial) return game.tutorial.order ? game.tutorial.order() : [B(), { k: "cola", got: false }];
   let nb = r < d.multiP * .25 ? 3 : r < d.multiP ? 2 : 1;
   if (c.kind === "family") nb = 3;
   if (c.kind === "critic" || c.kind === "vip") nb = 1 + (Math.random() < .4 ? 1 : 0);
@@ -5315,44 +5425,118 @@ const TUT = [
   { st: "window", t: "Kolayı da <b>🛎️ Teslim penceresine</b> götür.", done: () => !!tutCust() && tutCust().state === "leaving" }
 ];
 const tutEl = document.getElementById("tut");
-function tutTarget(){
-  const Tt = game.tutorial; if (!Tt || Tt.finishT != null) return null;
-  if (players.some(p => p.hand.some(isBurnt))) return null;
-  return TUT[Tt.step] ? TUT[Tt.step].st : null;
+/* ---------- ÜRÜN EĞİTİMİ: her mekâna ilk girişte (burgerci, kahveci, fırın, otel…) ürünler tek tek ----------
+   Her ürün için gerçek bir müşteri gelir ve tam o ürünü sipariş eder; adım adım istasyonlar parlar,
+   oyuncu kendisi yapar. Süre bu sırada akmaz, personel bekler. Her an "Bu ürünü geç" ya da "Eğitimi kapat". */
+const hasSt = t => stations.some(s => s.type === t);
+const holdAny = fn => players.some(p => p.hand.some(it => !isBurnt(it) && fn(it))) || counters().some(st => st.items.some(it => !isBurnt(it) && fn(it)));
+const stL = t => { const i = stInfo(t) || ["•", t]; return `${i[0]} <b>${i[1].split(" · ")[0]}</b>`; };
+function prodNames(){
+  const S = WORK ? WORK_SKINS[WORK.k] : null, dr = drinkInfo();
+  if (S) return { burger: S.nm.prod, cheese: S.nm.latte, veg: S.nm.veg, sig: S.nm.sig, fries: S.nm.side, drink: (S.drink || dr)[0], raw: S.nm.raw, vraw: S.nm.vraw, done: S.nm.done, ic: { burger: S.prod, cheese: S.latte, veg: S.veg, sig: S.sig, fries: S.side, drink: (S.drink || dr)[1] } };
+  return { burger: "Burger", cheese: "Cheeseburger", veg: "Vejetaryen burger", sig: (save.recipe && save.recipe.name) || "İmza burger", fries: "Patates kızartması", drink: dr[0], raw: "çiğ köfte", vraw: "sebze köftesi", done: "pişmiş köfte", spc: !WORK && save.level >= 5 && venueV() > 5 ? venueFood()[1] : "Spesiyal burger",
+    ic: { burger: "🍔", cheese: "🧀", veg: "🌱", sig: "⭐", fries: "🍟", drink: dr[1], spc: !WORK && save.level >= 5 && venueV() > 5 ? venueFood()[0] : "🌟" } };
 }
-function startTutorial(){
-  game.tutorial = { step: 0, cust: null, finishT: null, html: "" };
-  const c = spawnCustomer(); game.tutorial.cust = c;
-  c.group.position.set(-7, .03, 5.4);
+function ptProducts(){
+  const L = save.level, F = feat(L), N = prodNames(), B = (o = {}) => Object.assign({ k: "burger", cheese: false, veg: false, sauce: false, sig: false, got: false }, o);
+  const c = () => tutCust();
+  const deliverSt = () => { const cu = c(); return cu && cu.table && ["toTable", "seated"].includes(cu.state) ? cu.table.id : "window"; };
+  const S = {
+    reg: { st: "register", t: () => `${stL("register")}: müşteri geldi! Yanına git, <b>Etkileşim</b> ile siparişini al.`, done: () => !!(c() && c().order) },
+    put: v => ({ st: "grill", t: () => `${stL("grill")} istasyonuna git ve bas: ${v ? N.vraw : N.raw} pişmeye başlar.`, done: () => grillSlots.some(sl => sl.patty) || holdAny(it => it.type === "patty" || it.type === "burger") }),
+    take: { st: "grill", t: () => `Pişiyor… panelde <b>“✓✓”</b> görünce tekrar bas ve ${N.done} al. Bekletirsen yanar!`, done: () => holdAny(it => it.type === "patty" || it.type === "burger") },
+    crate: { st: "crate", t: () => `${stL("crate")}: önce ${N.vraw} al.`, done: () => holdAny(it => it.type === "vraw" || (it.type === "patty" && it.veg) || (it.type === "burger" && it.veg)) || grillSlots.some(sl => sl.patty && sl.patty.veg) },
+    asm: v => ({ st: "assemble", t: () => `${stL("assemble")}: elindekini götür, <b>${v || N.burger}</b> hazırlansın.`, done: () => holdAny(it => it.type === "burger") }),
+    cheese: { st: "cheese", t: () => `${stL("cheese")}: ${N.burger.toLowerCase()} buraya götür → <b>${N.cheese}</b> olur.`, done: () => holdAny(it => it.type === "burger" && it.cheese) },
+    sauce: { st: "sauce", t: () => `${stL("sauce")}: son dokunuş, <b>${N.sig}</b> hazır olsun.`, done: () => holdAny(it => it.type === "burger" && it.sauce) },
+    fput: { st: "fryer", t: () => `${stL("fryer")}: bas, <b>${N.fries}</b> pişmeye başlasın.`, done: () => fryBaskets.some(b => b.fr) || holdAny(it => it.type === "fries") },
+    ftake: { st: "fryer", t: () => `Hazır olunca (“✓”) tekrar bas, ${N.fries.toLowerCase()} al.`, done: () => holdAny(it => it.type === "fries") },
+    fridge: { st: "fridge", t: () => `${stL("fridge")}: bir ${N.drink.toLowerCase()} al.`, done: () => holdAny(it => it.type === "cola") },
+    give: { st: deliverSt, t: () => { const cu = c(); return cu && cu.table && ["toTable", "seated"].includes(cu.state) ? "Hazır! Müşteri masada: <b>masanın yanından geç</b>, servis kendiliğinden olur." : `Hazır! ${stL("window")} penceresine götür ve teslim et.`; }, done: () => { const cu = c(); return !!cu && (cu.state === "leaving" || (cu.order && cu.order.every(n => n.got))); } }
+  };
+  const list = [];
+  list.push({ id: "burger", ic: N.ic.burger, n: N.burger, order: () => [B()], steps: [S.reg, S.put(false), S.take, S.asm(), S.give] });
+  if (hasSt("fridge")) list.push({ id: "drink", ic: N.ic.drink, n: N.drink, order: () => [{ k: "cola", got: false }], steps: [S.reg, S.fridge, S.give] });
+  if (F.fries && hasSt("fryer")) list.push({ id: "fries", ic: N.ic.fries, n: N.fries, order: () => [{ k: "fries", got: false }], steps: [S.reg, S.fput, S.ftake, S.give] });
+  if (F.cheese && hasSt("cheese")) list.push({ id: "cheese", ic: N.ic.cheese, n: N.cheese, order: () => [B({ cheese: true })], steps: [S.reg, S.put(false), S.take, S.asm(), S.cheese, S.give] });
+  if (F.veg && hasSt("crate")) list.push({ id: "veg", ic: N.ic.veg, n: N.veg, order: () => [B({ veg: true })], steps: [S.reg, S.crate, S.put(true), S.take, S.asm(N.veg), S.give] });
+  if (F.sauce && save.recipe && hasSt("sauce")){ const R = save.recipe; list.push({ id: "sig", ic: N.ic.sig, n: N.sig, order: () => [B({ cheese: R.cheese, veg: R.veg, sauce: true, sig: true })],
+    steps: [S.reg].concat(R.veg ? [S.crate] : [], [S.put(R.veg), S.take, S.asm()], R.cheese ? [S.cheese] : [], [S.sauce, S.give]) }); }
+  if (!WORK && save.level >= 5 && venueV() > 5 && F.veg && F.cheese && hasSt("crate") && hasSt("cheese")) list.push({ id: "spc", ic: N.ic.spc, n: N.spc, order: () => [B({ cheese: true, veg: true, spc: true })], steps: [S.reg, S.crate, S.put(true), S.take, S.asm(), S.cheese, S.give] });
+  return list;
+}
+const ptKey = () => WORK ? `w:${WORK.k}:${(workOf(WORK.k) || {}).level || 1}` : BRANCH ? `b:${BRANCH}` : `v:${lvKey()}`;
+function ptWanted(){
+  try { if (NET.open || previewBackup || window.__noGuide || (isTest() && !window.__forceGuide) || coachPrefs().off) return false; } catch(e){ return false; }
+  const done = prefs.ptDone || {}; return !done[ptKey()];
+}
+function tutTarget(){
+  const Tt = game.tutorial; if (!Tt || Tt.finishT != null || Tt.between) return null;
+  if (players.some(p => p.hand.some(isBurnt))) return null;
+  const st = Tt.steps ? Tt.steps[Tt.step] : TUT[Tt.step]; if (!st) return null;
+  return typeof st.st === "function" ? st.st() : st.st;
+}
+function startTutorial(products){
+  const list = products || ptProducts();
+  game.tutorial = { step: 0, cust: null, finishT: null, html: "", list, pi: 0, steps: list[0].steps, order: list[0].order, key: ptKey(), between: 0 };
+  ptSpawn();
   tutEl.style.display = "block";
 }
+function ptClean(){      // yeni ürüne temiz başla: eller, tezgâhlar, ızgara ve fritöz boş
+  try { players.forEach(p => setHand(p, [])); counters().forEach(st => { st.items = []; if (typeof renderCounter === "function") renderCounter(st); });
+    grillSlots.forEach(sl => { sl.patty = null; if (sl.mesh) sl.mesh.visible = false; }); fryBaskets.forEach(b => { b.fr = null; }); } catch(e){}
+}
+function ptSpawn(){ const Tt = game.tutorial; if (Tt.pi > 0) ptClean(); const c = spawnCustomer("normal"); if (!c) return; Tt.cust = c; if (save.level === 1 && !WORK) c.group.position.set(-7, .03, 5.4); }
 function endTutorial(skipped){
+  const Tt = game.tutorial;
   game.tutorial = null; tutEl.style.display = "none";
   save.tutorialDone = true; writeSave();
+  if (Tt && Tt.key){ (prefs.ptDone = prefs.ptDone || {})[Tt.key] = 1; }
+  ["controls", "burger", "drink", "counter"].concat(Tt && Tt.list ? Tt.list.map(p => ({ cheese: "cheese", veg: "veg", sig: "sauce", fries: "fries", spc: "special" })[p.id]).filter(Boolean) : []).forEach(k => taught()[k] = 1);
+  writePrefs();
   if (!skipped){ game.time = game.d.shift; game.spawnT = 2; }
-  ["controls", "burger", "drink"].forEach(k => taught()[k] = 1);
   showDayBanner(game.d);
   setTimeout(() => { if (mode === "game" && game.running) teachForShift(); }, 3900);
 }
+function ptNext(skip){
+  const Tt = game.tutorial; if (!Tt) return;
+  if (skip && Tt.cust && Tt.cust.state !== "leaving"){ Tt.cust.state = "leaving"; }
+  Tt.pi++;
+  if (Tt.pi >= Tt.list.length){ Tt.finishT = 4; Tt.html = ""; return; }
+  Tt.steps = Tt.list[Tt.pi].steps; Tt.order = Tt.list[Tt.pi].order; Tt.step = 0; Tt.between = 2.2; Tt.cust = null;
+  flash(`✅ Öğrendin! Sıradaki: ${Tt.list[Tt.pi].ic} ${Tt.list[Tt.pi].n}`, "#43c06a"); SND.play("levelup");
+}
 function updateTutorial(dt){
   const Tt = game.tutorial; if (!Tt) return;
-  if (Tt.finishT != null){ Tt.finishT -= dt; if (Tt.finishT <= 0) endTutorial(false); return; }
-  if (Tt.step >= 2 && Tt.step <= 3 && !grillSlots.some(sl => sl.patty) && !anyHolding("patty") && !anyHolding("burger") && !players.some(p => p.hand.some(isBurnt))) Tt.step = 1;
-  while (TUT[Tt.step] && TUT[Tt.step].done()) Tt.step++;
+  if (Tt.finishT != null){ Tt.finishT -= dt; if (Tt.finishT <= 0) endTutorial(false); }
+  else if (Tt.between > 0){ Tt.between -= dt; if (Tt.between <= 0){ Tt.between = 0; ptSpawn(); } }
+  else {
+    const steps = Tt.steps || TUT;
+    if (steps === TUT && Tt.step >= 2 && Tt.step <= 3 && !grillSlots.some(sl => sl.patty) && !anyHolding("patty") && !anyHolding("burger") && !players.some(p => p.hand.some(isBurnt))) Tt.step = 1;
+    // pişirme adımlarında elindeki gitti / yandıysa geri dön
+    if (Tt.steps){ const cur = steps[Tt.step]; if (cur && cur.st === "grill" && Tt.step > 0 && !steps[Tt.step - 1].done()) Tt.step--; }
+    while (steps[Tt.step] && steps[Tt.step].done()) Tt.step++;
+    if (Tt.step >= steps.length){ if (Tt.list) ptNext(false); else Tt.finishT = 4; }
+  }
   let html;
-  if (Tt.step >= TUT.length){
-    Tt.finishT = 4;
-    html = `<div class="th"><span>🎉 Öğretici tamam</span></div><div class="tt"><b>Harika!</b> İlk siparişi teslim ettin. Şimdi gerçek vardiya başlıyor: sarı yanıp sönen balon sıradaki adımı gösterecek.</div>`;
+  const P = Tt.list && Tt.list[Math.min(Tt.pi, Tt.list.length - 1)], n = Tt.list ? Tt.list.length : 1;
+  if (Tt.finishT != null){
+    html = `<div class="th"><span>🎉 Eğitim tamam</span></div><div class="tt"><b>Harika!</b> ${Tt.list ? `Bu mekânın ${n} ürününü de kendin yaptın.` : "İlk siparişi teslim ettin."} Şimdi gerçek vardiya başlıyor: siparişler karışık gelecek, sarı balon sıradaki istasyonu gösterir.</div>`;
+  } else if (Tt.between > 0){
+    html = `<div class="th"><span>📖 Ürün ${Tt.pi + 1}/${n}</span><button id="tutSkip">Eğitimi kapat ✕</button></div><div class="tt">Sıradaki ürün: <b>${P.ic} ${escapeHtml(P.n)}</b> · yeni müşteri geliyor, bunu sipariş edecek…</div>`;
   } else {
-    const burntP = players.find(p => p.hand.some(isBurnt));
-    const text = burntP ? `Köfte yandı! 🔥 Çöpe yürümene gerek yok: <b>${trashKeyName(burntP)}</b> ile at, sonra ızgaraya yeni köfte koy.` : TUT[Tt.step].t;
-    const keyHint = isTouch ? "Sol yarıda parmağını kaydırarak yürü · istasyonun yanında <b>Etkileşim</b> · 🗑️ butonu elindekini atar"
+    const steps = Tt.steps || TUT, burntP = players.find(p => p.hand.some(isBurnt)), st = steps[Tt.step];
+    const text = burntP ? `Yandı! 🔥 Çöpe yürümene gerek yok: <b>${trashKeyName(burntP)}</b> ile at, sonra yeniden koy.` : st ? (typeof st.t === "function" ? st.t() : st.t) : "";
+    const keyHint = isTouch ? "Sol yarıda parmağını kaydırarak yürü · istasyonun yanında <b>Etkileşim</b> · 🗑️ elindekini atar"
       : (players.length === 2 ? "Oyuncu 1: <kbd>WASD</kbd> + <kbd>E</kbd> (<kbd>X</kbd> at) · Oyuncu 2: <kbd>Oklar</kbd> + <kbd>Enter</kbd> (<kbd>.</kbd> at)" : "<kbd>W A S D</kbd> ile yürü · istasyonun yanında <kbd>E</kbd> bas · <kbd>X</kbd> elindekini atar");
-    html = `<div class="th"><span>Öğretici · Adım ${Tt.step + 1}/${TUT.length}</span><button id="tutSkip">Geç</button></div>
+    html = Tt.list ? `<div class="th"><span>📖 ${P.ic} ${escapeHtml(P.n)} nasıl yapılır? · ürün ${Tt.pi + 1}/${n}</span><span class="tbtns"><button id="tutNext">Bu ürünü geç</button><button id="tutSkip">✕</button></span></div>
+      <div class="tt">${Tt.step + 1}. ${text}</div><div class="tk">${keyHint}</div>
+      <div class="dots">${steps.map((_, i) => `<i class="${i <= Tt.step ? "on" : ""}"></i>`).join("")}</div>`
+      : `<div class="th"><span>Öğretici · Adım ${Tt.step + 1}/${TUT.length}</span><button id="tutSkip">Geç</button></div>
       <div class="tt">${text}</div><div class="tk">${keyHint}</div>
       <div class="dots">${TUT.map((_, i) => `<i class="${i <= Tt.step ? "on" : ""}"></i>`).join("")}</div>`;
   }
-  if (html !== Tt.html){ Tt.html = html; tutEl.innerHTML = html; const sk = document.getElementById("tutSkip"); if (sk) sk.onclick = () => endTutorial(true); }
+  if (html !== Tt.html){ Tt.html = html; tutEl.innerHTML = html; const sk = document.getElementById("tutSkip"); if (sk) sk.onclick = () => endTutorial(true); const nx = document.getElementById("tutNext"); if (nx) nx.onclick = () => ptNext(true); }
 }
 
 /* =====================================================================
@@ -5495,6 +5679,7 @@ function slotsFor(sp, k){
 }
 function homeInteract(p){
   if (activity || p.lockT > 0) return;
+  { const kd = typeof kidNear === "function" && kidNear(p.group.position); if (kd && (kd.k.req || !homeSpots.some(sp => Math.hypot(p.group.position.x - sp.x, p.group.position.z - sp.z) <= sp.range * .6))){ showKidReq(kd.k); return; } }
   let best = null, bd = 1e9;
   const pos = p.group.position;
   homeSpots.forEach(sp => { const d = Math.hypot(pos.x - sp.x, pos.z - sp.z); if (d <= sp.range && d < bd){ bd = d; best = sp; } });
@@ -5804,6 +5989,8 @@ function updateEdit(dt){
     const b = furnBox(edit.hold), ok = canPlace(edit.hold, edit.hold.uid);
     edit.marker.scale.set(b.x1 - b.x0, b.z1 - b.z0, 1); edit.marker.position.set(cx, .09, cz);
     edit.marker.material.color.set(ok ? 0x43c06a : 0xe9555b);
+    if (edit._ok !== ok){ edit._ok = ok; const em = document.querySelector("#editBar .eb-h em"), pb = document.getElementById("ePut");
+      if (em){ em.className = ok ? "ok" : "no"; em.textContent = ok ? "✓ buraya konur" : "✕ " + placeWhy(edit.hold).replace(/^\S+\s/, ""); } if (pb) pb.disabled = !ok; }
   } else {
     edit.marker.scale.set(.6, .6, 1); edit.marker.position.set(cx, .09, cz);
     edit.marker.material.color.set(furnAt(cx, cz) ? 0xffd21a : 0x3d8bff);
@@ -5860,19 +6047,64 @@ function exitEdit(){
   if (edit.marker) world.remove(edit.marker);
   writeSave(); renderEditBar(); setMode("home"); updateHomeHud();
 }
+/* ev düzenleme: basit panel — eşya listesinden seç, oklarla kaydır, döndür, bırak.
+   İstersen 🪄 Otomatik yerleştir hepsini kendisi dizer; sürükle-bırak da çalışmaya devam eder. */
 function renderEditBar(){
   const el = document.getElementById("editBar");
   if (!edit.on){ el.style.display = "none"; return; }
   el.style.display = "flex";
-  el.innerHTML = `<span>🛠 ${edit.hold ? "Taşınıyor: <b>" + FURN[edit.hold.id].name + "</b> · istediğin yere sürükle ya da dokun" : "Eşyayı parmağınla / fareyle <b>sürükleyip bırak</b>"}${isTouch ? "" : " · E: al/bırak · Q: döndür · X: sat"}</span>
-    <button class="sec" id="eRot" ${edit.hold ? "" : "disabled"}>↻ Döndür</button>
-    <button class="sec" id="eSell">💰 Sat</button>
-    <button id="eDone">✓ Bitti</button>`;
-  document.getElementById("eRot").onclick = editRotate;
-  document.getElementById("eSell").onclick = editSell;
-  document.getElementById("eDone").onclick = exitEdit;
+  if (edit.hold){
+    const f = edit.hold, d = FURN[f.id], ok = canPlace(f, f.uid) ;
+    el.innerHTML = `<div class="eb-h">${d.ic || "📦"} <b>${escapeHtml(d.name)}</b> <em class="${ok ? "ok" : "no"}">${ok ? "✓ buraya konur" : "✕ " + escapeHtml(placeWhy(f).replace(/^\S+\s/, ""))}</em></div>
+      <div class="eb-row eb-move"><button class="sec eb-a" data-mv="l" aria-label="sola">◀</button><button class="sec eb-a" data-mv="u" aria-label="yukarı">▲</button><button class="sec eb-a" data-mv="d" aria-label="aşağı">▼</button><button class="sec eb-a" data-mv="r" aria-label="sağa">▶</button><button class="sec eb-a" id="eRot" aria-label="döndür">↻</button></div>
+      <div class="eb-row"><button class="sec" id="eAuto">🎯 Boş yer bul</button><button class="sec" id="eSell">💰 Sat</button><button class="sec" id="eCancel">✕ Vazgeç</button><button id="ePut" ${ok ? "" : "disabled"}>✓ Bırak</button></div>`;
+    el.querySelectorAll("[data-mv]").forEach(b => b.onclick = () => editNudge(b.dataset.mv));
+    on("eRot", () => { editRotate(); renderEditBar(); });
+    on("eAuto", () => { const g = findFreeSpot(f.id, { x: f.x, z: f.z }, { ignore: f.uid }); if (g){ Object.assign(f, { x: g.x, z: g.z, rot: g.rot }); edit.cursor.set(g.x, 0, g.z); updateEdit(0); renderEditBar(); SND.play("step", .1); } else flash("Bu katta boş yer yok", "#e9555b"); });
+    on("eSell", editSell);
+    on("eCancel", editCancel);
+    on("ePut", () => { editAct(); renderEditBar(); });
+    return;
+  }
+  const list = floorFurn().filter(f => FURN[f.id]);
+  el.innerHTML = `<div class="eb-h">🛠 <b>Evi düzenle</b> <span>Taşımak istediğin eşyaya dokun${isTouch ? "" : " ya da sürükle"}</span></div>
+    <div class="eb-list">${list.map(f => `<button class="sec eb-it" data-fu="${f.uid}">${FURN[f.id].ic || "📦"}<small>${escapeHtml(FURN[f.id].name)}</small></button>`).join("") || `<span>Bu katta eşya yok</span>`}</div>
+    <div class="eb-row"><button class="sec" id="eMagic">🪄 Otomatik diz</button><button class="sec" id="eShop">🛒 Eşya al</button>${homeExpandAvail() ? `<button class="sec" id="eGrow">🏗️ Evi büyüt</button>` : ""}<button id="eDone">✓ Bitti</button></div>`;
+  el.querySelectorAll("[data-fu]").forEach(b => b.onclick = () => { const f = save.home.furniture.find(o => o.uid === b.dataset.fu); if (!f) return; removeFurn(f); edit.orig = { x: f.x, z: f.z, rot: f.rot }; setHold(f, false); updateEdit(0); renderEditBar(); SND.play("pickup"); });
+  on("eMagic", autoArrange);
+  on("eShop", () => { exitEdit(); showShop("furn"); });
+  on("eGrow", () => { exitEdit(); showHomeExpand(); });
+  on("eDone", exitEdit);
 }
-
+/* oklar: ekrana göre yön (kamera nereye bakarsa) */
+function editNudge(dir){
+  if (!edit.hold) return;
+  const st = .5, fwd = new THREE.Vector3(-Math.sin(cam.az), 0, -Math.cos(cam.az)), right = new THREE.Vector3(Math.cos(cam.az), 0, -Math.sin(cam.az));
+  const v = dir === "u" ? fwd : dir === "d" ? fwd.clone().negate() : dir === "r" ? right : right.clone().negate();
+  // en yakın eksene oturt (ızgarada düzgün kayar)
+  const ax = Math.abs(v.x) > Math.abs(v.z) ? [Math.sign(v.x), 0] : [0, Math.sign(v.z)];
+  edit.cursor.x = edit.hold.x + ax[0] * st; edit.cursor.z = edit.hold.z + ax[1] * st; updateEdit(0); renderEditBar(); SND.play("step", .06);
+}
+function editCancel(){
+  if (!edit.hold) return;
+  const f = edit.hold;
+  if (edit.isNew){ save.money += FURN[f.id].price; setHold(null); writeSave(); updateHomeHud(); renderEditBar(); return; }
+  Object.assign(f, edit.orig || {}); if (!canPlace(f, f.uid)){ const g = findFreeSpot(f.id, f); if (g) Object.assign(f, { x: g.x, z: g.z, rot: g.rot }); }
+  save.home.furniture.push(f); placeFurnMesh(f); V.obst = computeHomeObst(); setHold(null); renderEditBar();
+}
+/* 🪄 otomatik: bu kattaki bütün eşyaları odalarına göre düzgünce yerleştir */
+function autoArrange(){
+  const mine = floorFurn().slice(); if (!mine.length) return;
+  const keep = save.home.furniture.filter(f => !onFloor(f));
+  mine.forEach(f => { if (f._mesh) world.remove(f._mesh); });
+  homeSpots = homeSpots.filter(s => { if (s.furn && mine.includes(s.furn)){ if (s.act) s.act.remove(); return false; } return true; });
+  save.home.furniture = keep;
+  const order = mine.slice().sort((a, b) => (FURN[b.id].w * FURN[b.id].d) - (FURN[a.id].w * FURN[a.id].d));
+  let moved = 0;
+  order.forEach(f => { const g = findFreeSpot(f.id, null); if (g){ if (g.x !== f.x || g.z !== f.z) moved++; Object.assign(f, { x: g.x, z: g.z, rot: g.rot }); } f.fl = curFloor(); save.home.furniture.push(f); placeFurnMesh(f); });
+  V.obst = computeHomeObst(); writeSave(); renderEditBar(); updateHomeHud(); SND.play("place");
+  flash(`🪄 ${mine.length} eşya otomatik yerleştirildi`, "#43c06a");
+}
 /* =====================================================================
    GİRDİ
    ===================================================================== */
@@ -6416,7 +6648,7 @@ function showMenu(){
       <button id="bShop" title="Elmas mağazası">${pic("gem")}<b class="nb">${prefs.diamonds}</b></button>
       <button id="bHow" title="Nasıl oynanır">${pic("help")}</button>
       ${started && !net ? `<button id="bStoryCas" title="Karakterini düzenle">${pic("user")}</button>` : ""}
-    </div><div class="ttl-ver">sürüm v${NET_BUILD}</div>`);
+    </div><div class="ttl-ver">sürüm v${NET_BUILD}</div>${acctChipHTML()}`);
   overlay.firstElementChild.classList.add("title"); overlay.classList.add("title-ov");
   overlay.firstElementChild.classList.add("menu");
   if (isIOS() && !isStandalone() && !window.Capacitor && !prefs.iosHintSeen && !NET.open) setTimeout(() => { if (mode === "menu" && overlay.querySelector(".menu")) iosFullHint(); }, 900);
@@ -6494,6 +6726,7 @@ function showSettings(back = showMenu){
   const full = !window.Capacitor && (document.fullscreenEnabled || document.webkitFullscreenEnabled);
   modal(`<h2>⚙️ Ayarlar</h2>
     <div class="set-list">
+      <div class="set-item"><div><b>👤 Hesap</b><small>${(() => { const A = authInfo(); return A && A.mode === "google" ? "Google: " + escapeHtml(A.email || A.name || "") + " · kayıtlar bulutta" : "Misafir: kayıtlar sadece bu cihazda"; })()}</small></div><button class="sec" id="sAcct">${authInfo() && authInfo().mode === "google" ? "Yönet" : "Google'a bağlan"}</button></div>
       <div class="set-item"><div><b>Ses ve müzik</b><small>Müzik, mutfak ve müşteri sesleri</small></div><button class="sec" id="sMute">${save.muted ? "🔇 Kapalı" : "🔊 Açık"}</button></div>
       <div class="set-item"><div><b>İpuçları</b><small>${HINT_MODES[save.hintMode || "auto"]}</small></div><button class="sec" id="sHint">Değiştir</button></div>
       <div class="set-item"><div><b>📖 Rehber önerileri</b><small>${coachPrefs().off ? "Kapalı: hiçbir ekranda tanıtım önerisi çıkmaz (Rehber merkezinden yine izlenir)" : "Açık: bir ekrana ilk gelişte kısa tanıtım önerilir (hep isteğe bağlı)"}</small></div><button class="sec" id="sCoach">${coachPrefs().off ? "Aç" : "Kapat"}</button></div>
@@ -6508,6 +6741,7 @@ function showSettings(back = showMenu){
     </div>
     <div class="btns"><button class="sec" id="sBack">← Geri</button></div>`);
   on("sMute", () => { toggleMute(); showSettings(back); });
+  on("sAcct", () => showAccount(() => showSettings(back)));
   on("sCoach", () => { const P = coachPrefs(); P.off = !P.off; writePrefs(); coachOfferClose(); showSettings(back); });
   on("sCoachR", () => { prefs.coach = { seen: {}, never: {}, off: false }; prefs.taught = {}; COACH.later = {}; writePrefs(); flash("📖 Rehber sıfırlandı: tanıtımlar yeniden önerilecek", "#43c06a"); });
   on("sHint", () => { const order = ["auto", "on", "off"]; save.hintMode = order[(order.indexOf(save.hintMode || "auto") + 1) % 3]; writeSave(); showSettings(back); });
@@ -6572,6 +6806,7 @@ function beginGame(count){
   continueDay();
 }
 function ensureHome(){
+  try { applyHomeExt(); } catch(e){}
   if (!save.home.type){ save.home.type = "studio"; save.home.owned = ["studio"]; save.home.furniture = starterFurniture(); writeSave(); }
   // tek katlı evde üst kat eşyası kalmasın (eski çatı katlı stüdyo kayıtları)
   if (!(HOMES[save.home.type].floors > 1) && save.home.furniture.some(f => (f.fl || 1) !== 1)){
@@ -6671,9 +6906,10 @@ function startShift(count, withTutorial){
   document.getElementById("hDay").textContent = `Gün ${game.d.day} · ${game.d.name}`;
   focusCam();
   closeOverlay();
-  if (withTutorial) startTutorial();
+  const pt = !withTutorial && ptWanted();                       // bu mekâna ilk giriş: ürünler tek tek, uygulamalı
+  if (withTutorial || pt) startTutorial();
   setMode("game");
-  if (!withTutorial) setTimeout(() => { if (mode === "game" && game.running) teachForShift(); }, 2300);
+  if (!withTutorial && !pt) setTimeout(() => { if (mode === "game" && game.running) teachForShift(); }, 2300);
   if (!withTutorial) cine(`GÜN ${game.d.day} · ${LV().short.toUpperCase()}`, LV().name, `${game.d.name}${game.adOn ? " · 📰 reklam yayında, kalabalık bekleniyor" : ""}${staff.length ? " · ekip: " + staff.map(w => STAFF_DEF[w.k].ic).join("") : ""}`, () => {}, 2100);
   if (save.level >= 5){ ensureQuests(); if (!save.quests.cities.includes(save.city)){ save.quests.cities.push(save.city); questProgress("cities", 0); } }
   if (players.some(p => p.sick)) setTimeout(() => flash("🤒 Hasta biri var: evde çorba yapın!", "#e9555b"), 3800);
@@ -6763,7 +6999,8 @@ function showSummary(){
         ${s.sigCost ? `<tr><td class="sub">İmza burger gideri satıştan düşüldü</td><td class="sub">$${fmt(s.sigCost)}</td></tr>` : ""}
         ${e.share ? `<tr><td>📈 Hissedar payı (%${Math.round(burgerSold() * 100)})</td><td class="neg">-$${fmt(e.share)}</td></tr>` : ""}
         <tr class="tot"><td>${W ? "İşletme net kârı (sana)" : "Restoran net kârı"}</td><td class="${s.net >= 0 ? "pos" : "neg"}">${s.net >= 0 ? "" : "-"}$${fmt(Math.abs(s.net || 0))}</td></tr>
-        ${e.homeBill - (e.care ? e.care.total : 0) ? `<tr><td>🏠 Ev kirası ve faturaları</td><td class="neg">-$${fmt(e.homeBill - (e.care ? e.care.total : 0))}</td></tr>` : ""}
+        ${e.homeBill - (e.care ? e.care.total : 0) - (e.kid ? e.kid.total : 0) ? `<tr><td>🏠 Ev kirası ve faturaları</td><td class="neg">-$${fmt(e.homeBill - (e.care ? e.care.total : 0) - (e.kid ? e.kid.total : 0))}</td></tr>` : ""}
+        ${e.kid && e.kid.total ? `<tr><td>👶 Çocuk giderleri <span class="sub">(${e.kid.items.map(i => escapeHtml(i[0]) + " $" + fmt(i[1])).join(" · ")})</span></td><td class="neg">-$${fmt(e.kid.total)}</td></tr>` : ""}
         ${e.care && e.care.total ? `<tr><td>🧴 Kişisel bakım <span class="sub">(${e.care.per.map(([i, c]) => (save.sims[i].body === "f" ? "♀ " : "♂ ") + escapeHtml(save.sims[i].name) + " $" + fmt(c)).join(" · ")})</span></td><td class="neg">-$${fmt(e.care.total)}</td></tr>` : ""}
         ${s.brs && s.brs.tot ? `<tr class="h"><td colspan="2">🌍 Şubeler</td></tr>${s.brs.lines.map(([n, v]) => `<tr><td>${n}</td><td class="pos">+$${fmt(v)}</td></tr>`).join("")}` : ""}
         ${capSummaryRows(s.cap)}
@@ -6905,7 +7142,8 @@ function showHomeMarket(){
         <div class="pr">${h.price ? "$" + fmt(h.price) : "Kira"}</div>
         <button data-home="${k}" ${cur || lock || (!owned && save.money < h.price) ? "disabled" : ""}>${cur ? "Şu an buradasınız" : owned ? "Taşın" : lock ? "Kilitli" : save.money < h.price ? "Para yetmiyor" : "Satın al ve taşın"}</button></div>`;
     }).join("")}</div>`;
-  modal(`<h2>🛒 Mağaza <span class="money">💵 $${fmt(save.money)}</span></h2>${tabs}${body}<div class="btns"><button class="sec" id="shClose">Kapat</button></div>`, true);
+  modal(`<h2>🛒 Mağaza <span class="money">💵 $${fmt(save.money)}</span></h2>${tabs}${homeExpandAvail() ? `<div class="act-grid"><button id="hmGrow">🏗️ Bu evi büyüt / kat çık</button></div>` : ""}${body}<div class="btns"><button class="sec" id="shClose">Kapat</button></div>`, true);
+  on("hmGrow", () => showHomeExpand(() => showHomeMarket()));
   overlay.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => showShop(b.dataset.tab));
   on("shClose", closeOverlay);
   overlay.querySelectorAll("[data-home]").forEach(b => b.onclick = () => moveHome(b.dataset.home));
@@ -7696,7 +7934,7 @@ const WORKER_AI = {
 };
 const othersDoing = (w, k) => staff.filter(o => o !== w && o.k === w.k && o.job && o.job.k === k).length;
 const needsTopping = it => it.want && ((it.want.cheese && !it.cheese) || (it.want.sauce && !it.sauce));
-function updateStaff(dt){ staff.forEach(w => updateWorker(w, dt)); }
+function updateStaff(dt){ if (game.tutorial && game.tutorial.list){ staff.forEach(w => { try { animSim(w.sim, dt, 0, false); } catch(e){} }); return; } staff.forEach(w => updateWorker(w, dt)); }      // ürün eğitiminde personel bekler, işi oyuncu yapar
 
 /* ---------- 🚻 tuvalet: kirlendikçe puan düşer ---------- */
 function wcTick(dt){
@@ -8061,14 +8299,15 @@ function ecoShiftEnd(){
   const hb = BILLS.home[save.home.type || "studio"] || [0, 0];
   const homeOwned = (save.home.owned || []).includes(save.home.type) && save.home.type !== "studio";
   const care = careCost();
-  const homeBill = Math.round((homeOwned ? 0 : hb[0]) + hb[1] * (save.level >= 4 ? 2 : 1)) + care.total;
+  const kid = typeof kidCosts === "function" ? kidCosts() : { total: 0, items: [] };
+  const homeBill = Math.round((homeOwned ? 0 : hb[0]) + hb[1] * (save.level >= 4 ? 2 : 1)) + care.total + kid.total;
   // maaş tavanı yok: gereğinden fazla personel = zarar
   const biz = Math.max(0, rent - (game.taxSave || 0)) + util + ingr + wages.reduce((a, w) => a + w[1], 0);
   save.revHist = (save.revHist || []).concat(gross).slice(-3);
   save.servedHist = (save.servedHist || []).concat(game.stats.served).slice(-4);
   Object.keys(STAFF_DEF).filter(hasStaff).forEach(k => { const i = staffMorale(k); i.morale = clamp(i.morale + 2 + officeMorale(), 0, 100); });
   save.chars.forEach(c => c.streak = (c.streak || 0) + 1);
-  return { rent, util, ingr, wages, homeBill, biz, gross, care };
+  return { rent, util, ingr, wages, homeBill, biz, gross, care, kid };
 }
 function staffQuits(){
   const q = Object.keys(STAFF_DEF).filter(k => hasStaff(k) && staffMorale(k).morale < 15);
@@ -10814,7 +11053,7 @@ const COACH_SCREENS = [
   { k: "guide", ic: "📖", n: "Rehber merkezi", is: () => !!ovQ("#gdB"),
     steps: [["[data-gt]", "Ekranlar ve oyun mekanikleri: istediğini yeniden izle."]] },
   { k: "edit", ic: "🛠", n: "Ev düzenleme", is: () => mode === "home" && typeof edit !== "undefined" && edit.on && !ovOpen(),
-    steps: [["#editBar", "Bir eşyaya dokun, sonra sürükle. Döndür, sat ya da bitir."], ["#eRot", "Seçili eşyayı döndür."], ["#eDone", "Bitir.", { act: 1 }]] },
+    steps: [[".eb-list", "Taşımak istediğin eşyaya buradan dokun (ya da evde eşyanın üstüne dokun).", { act: 1 }], ["[data-mv]", "Seçili eşyayı oklarla kaydır; ↻ ile döndür."], ["#ePut", "Yeşil \"✓ buraya konur\" yazınca bırak."], ["#eMagic", "🪄 Otomatik diz: uğraşmak istemezsen bütün eşyaları odalarına göre kendisi dizer."], ["#eGrow", "🏗️ Evi genişlet ya da üst kata çocuk odası kur."], ["#eDone", "Bitir."]] },
   { k: "out", ic: "🌃", n: "Şehirde bir mekân", is: () => mode === "out",
     steps: [["#overlay .btns button, #overlay .act-grid button", "Mekânda ne yapacağını seç: her seçenek ruh hali, karizma ve enerjiyi farklı etkiler."], ["#helpBtn", "⏸ Duraklat."]] },
   { k: "home", ic: "🏡", n: "Ev", is: () => mode === "home" && !ovOpen() && !(typeof edit !== "undefined" && edit.on), open: () => { closeOverlay(); },
@@ -11987,30 +12226,105 @@ const KID_NAMES = { f: ["Ela", "Defne", "Zeynep", "Mira", "Lina", "Asya"], m: ["
 const kidStage = k => { const a = save.day - k.born; return a < 12 ? ["👶", "Bebek", .42] : a < 40 ? ["🧒", "Çocuk", .62] : ["🧑", "Genç", .82]; };
 let kidActors = [];
 function clearKids(){ kidActors.forEach(a => { if (a.sim.root.parent) a.sim.root.parent.remove(a.sim.root); a.lbl.remove(); }); kidActors = []; }
+/* çocuk odası: tek kişilik yatağın olduğu yatak odası (yoksa ebeveyn yatağı olmayan bir yatak odası, o da yoksa salon) */
+function kidRoom(){
+  const fl0 = save.home.floor, H = HOMES[save.home.type || "studio"], out = [];
+  for (const fl of (H.floors > 1 ? [1, 2] : [1])){
+    save.home.floor = fl; const L = homeLayout();
+    L.rooms.filter(r => r.k === "bed").forEach(r => { const inR = f => (f.fl || 1) === fl && f.x > r.x0 && f.x < r.x1 && f.z > r.z0 && f.z < r.z1;
+      const single = save.home.furniture.some(f => f.id === "bed_single" && inR(f)), dbl = save.home.furniture.some(f => f.id === "bed_double" && inR(f));
+      out.push({ fl, r, score: (single ? 10 : 0) + (dbl ? -10 : 0) + (fl === 2 ? 1 : 0) }); });
+  }
+  save.home.floor = fl0;
+  out.sort((a, b) => b.score - a.score);
+  return out.length && out[0].score > -5 ? out[0] : null;
+}
 function spawnKids(){
   clearKids(); if (mode !== "home" || !(save.kids || []).length || !V || !V.playerStart) return;
-  save.kids.forEach((k, i) => { const st = kidStage(k), sim = buildSim(Object.assign({ name: k.name, role: "manager" }, k.look)); sim.root.scale.setScalar(st[2]);
-    const p0 = V.playerStart[0]; sim.root.position.set(p0[0] + .9 + i * .7, FLOOR_Y, p0[1] + 1.1); world.add(sim.root);
-    const lbl = makeLabel("cname"); lbl.textContent = `${st[0]} ${k.name}`; kidActors.push({ k, sim, lbl, t: Math.random() * 3, goal: null }); });
+  const kr = kidRoom(), here = curFloor(), p0 = V.playerStart[0];
+  save.kids.forEach((k, i) => {
+    const inRoom = kr && kr.fl === here, away = kr && kr.fl !== here;
+    if (away && !k.req && Math.random() < .5) return;    // odası diğer katta: çoğu zaman orada takılır (yemek / bahçe / istek için iner)
+    const st = kidStage(k), sim = buildSim(Object.assign({ name: k.name, role: "manager" }, k.look)); sim.root.scale.setScalar(st[2]);
+    const R = inRoom ? kr.r : null; k._away = !!away;
+    if (R) sim.root.position.set(lerp(R.x0 + .6, R.x1 - .6, Math.random()), FLOOR_Y, lerp(R.z0 + .6, R.z1 - .6, Math.random()));
+    else sim.root.position.set(p0[0] + .9 + i * .7, FLOOR_Y, p0[1] + 1.1);
+    world.add(sim.root);
+    const lbl = makeLabel("cname"); kidActors.push({ k, sim, lbl, t: Math.random() * 3, goal: null, room: R });
+  });
+  if (kr && kr.fl !== here && save.kids.some(k => !k.req)) setTimeout(() => flash(`🧸 Çocuklar ${kr.fl === 2 ? "üst" : "alt"} katta, odalarında takılıyor`, "#7C5CE0"), 1500);
 }
 function updateKids(dt){
   if (!kidActors.length) return;
   if (mode !== "home"){ clearKids(); return; }
   kidActors.forEach(a => { const r = a.sim.root, pos = r.position; if (r.parent !== world){ return; }
-    a.t -= dt; if (a.t <= 0){ a.t = 2.5 + Math.random() * 3; const me = players[0], c = me ? me.group.position : pos; a.goal = new THREE.Vector3(c.x + (Math.random() - .5) * 3, 0, c.z + (Math.random() - .5) * 3); try { const H = HOMES[save.home.type || "studio"]; if (Math.abs(a.goal.x) > H.w / 2 - .6 || Math.abs(a.goal.z) > H.d / 2 - .6 || roomAt(a.goal.x, a.goal.z).k !== roomAt(c.x, c.z).k) a.goal = null; } catch(e){ a.goal = null; } }
-    if (a.goal){ const dx = a.goal.x - pos.x, dz = a.goal.z - pos.z, d = Math.hypot(dx, dz); if (d > .1){ const s = Math.min(d, dt * 1.6); pos.x += dx / d * s; pos.z += dz / d * s; r.rotation.y = Math.atan2(dx, dz); animSim(a.sim, dt, 1.6, false); } else { a.goal = null; animSim(a.sim, dt, 0, false); } }
+    a.t -= dt;
+    if (a.t <= 0 && !(a.path && a.path.length && a.t > -10)){ a.t = 2.5 + Math.random() * 3.5; a.path = null;
+      const me = players[0], c = me ? me.group.position : pos, R = a.room;
+      const rr = Math.random(), gz = typeof gardenZone === "function" && curFloor() === 1 ? gardenZone() : null, table = homeSpots.find(sp => sp.fn === "dinner") || homeSpots.find(sp => sp.fn === "kitchen");
+      a.doing = null;
+      if (a.k.req && me && Math.hypot(c.x - pos.x, c.z - pos.z) > 1.4 && rr < .5) a.goal = new THREE.Vector3(c.x + (Math.random() - .5) * 1.2, 0, c.z + .9);     // isteği var: yanına gelir
+      else if (table && rr < .2 && a.k.ate !== save.day + ":" + Math.floor(performance.now() / 60000)){ a.goal = new THREE.Vector3(table.x + (Math.random() - .5) * .8, 0, table.z + .9); a.doing = "eat"; a.t = 7; }        // yemek yer
+      else if (gz && rr < .45 && kidGroup(a.k) !== "b"){ a.goal = new THREE.Vector3(lerp(gz.x0 + .4, gz.x1 - .4, Math.random()), 0, lerp(gz.z0 + .4, gz.z1 - .4, Math.random())); a.doing = "garden"; a.t = 6; }   // bahçede oynar
+      else if (R) a.goal = new THREE.Vector3(lerp(R.x0 + .5, R.x1 - .5, Math.random()), 0, lerp(R.z0 + .5, R.z1 - .5, Math.random()));          // kendi odasında takılır
+      else { a.goal = new THREE.Vector3(c.x + (Math.random() - .5) * 3, 0, c.z + (Math.random() - .5) * 3); }
+      try { const H = HOMES[save.home.type || "studio"]; a.goal.x = clamp(a.goal.x, -H.w / 2 + .6, H.w / 2 - .6); a.goal.z = clamp(a.goal.z, -H.d / 2 + .6, H.d / 2 - .6); } catch(e){}
+      if (!a.goal || (!a.doing && !a.k.req && Math.random() < .25)){ a.goal = null; a.jump = 1.2; }                                // oyun oynar, zıplar
+    }
+    if (a.goal && !a.path){ try { a.path = navPath(new THREE.Vector3(pos.x, 0, pos.z), new THREE.Vector3(a.goal.x, 0, a.goal.z)); } catch(e){ a.path = null; } if (!a.path){ a.goal = null; a.doing = null; } }
+    if (a.goal && a.path){ a.group = r; const done = followPath(a, dt, 1.6); animSim(a.sim, dt, done ? 0 : 1.6, false);
+      if (done){ a.goal = null; a.path = null;
+        if (a.doing === "eat"){ a.k.ate = save.day + ":" + Math.floor(performance.now() / 60000); popup(["🍝", "🥣", "🍎", "🥪"][ri(4)], pos.x, 1.5, pos.z); if (a.k.mealDay !== save.day){ a.k.mealDay = save.day; a.k.hap = Math.min(100, a.k.hap + 4); } }
+        if (a.doing === "garden"){ a.jump = 2.5; popup(["⚽", "🪁", "🦋", "🌼", "🛝"][ri(5)], pos.x, 1.6, pos.z); if (a.k.gardenDay !== save.day){ a.k.gardenDay = save.day; a.k.hap = Math.min(100, a.k.hap + 5); } }
+        a.doing = null; } }
     else animSim(a.sim, dt, 0, false);
-    if (a.jump){ a.jump -= dt; pos.y = FLOOR_Y + Math.max(0, Math.sin(a.jump * 10)) * .25; } else pos.y = FLOOR_Y;
-    place(a.lbl, pos.x, 1.0 + kidStage(a.k)[2], pos.z); a.lbl.style.display = ""; });
+    if (a.jump > 0){ a.jump -= dt; pos.y = FLOOR_Y + Math.max(0, Math.sin(a.jump * 10)) * .25; } else pos.y = FLOOR_Y;
+    const st = kidStage(a.k), txt = `${st[0]} ${a.k.name}${a.k.req ? " 💭" + a.k.req.ic : ""}`; if (a.lbl.textContent !== txt) a.lbl.textContent = txt;
+    place(a.lbl, pos.x, 1.0 + st[2], pos.z); a.lbl.style.display = ""; });
+}
+/* ---------- çocukların istekleri ---------- */
+const KID_REQ = {
+  b: [["🍼", "Mama ve bez lazım", 8, 10], ["🧸", "Peluş oyuncak istiyor", 12, 15], ["🎵", "Ninni söylemeni istiyor", 0, 12], ["🛁", "Banyo vakti, köpüklü olsun", 0, 10]],
+  c: [["🍦", "Dondurma istiyor", 4, 10], ["🧸", "Yeni oyuncak istiyor", 15, 15], ["⚽", "Futbol kursuna yazılmak istiyor", 40, 20], ["🎂", "Arkadaşının doğum günü için hediye lazım", 12, 12], ["🎢", "Lunaparka gitmek istiyor", 25, 22], ["📚", "Masal okumanı istiyor", 0, 12], ["🍕", "Pizza akşamı yapalım diyor", 14, 14], ["🎨", "Boya seti istiyor", 10, 12]],
+  t: [["🎮", "Oyun konsolu istiyor", 150, 30], ["📱", "Yeni telefon istiyor", 120, 25], ["👟", "Marka ayakkabı istiyor", 60, 18], ["🚌", "Okul gezisi parası lazım", 35, 15], ["🎸", "Gitar kursuna gitmek istiyor", 50, 20], ["💬", "Seninle konuşmak istiyor", 0, 15], ["🎬", "Arkadaşlarıyla sinemaya gidecek, harçlık", 20, 12]]
+};
+const kidGroup = k => { const a = save.day - k.born; return a < 12 ? "b" : a < 40 ? "c" : "t"; };
+function newKidReq(k){ const L = KID_REQ[kidGroup(k)], [ic, t, c, h] = L[ri(L.length)]; k.req = { ic, t, cost: Math.round(c * lifeScale()), hap: h, d: save.day }; }
+function kidReqAnswer(k, yes){
+  const r = k.req; if (!r) return;
+  if (yes){ if (save.money < r.cost){ flash("💸 Bunun için para yetmiyor", "#e9555b"); return false; } save.money -= r.cost; k.hap = Math.min(100, k.hap + r.hap); save.mood = Math.min(100, save.mood + 4);
+    flash(`${r.ic} ${k.name} çok sevindi! ${r.cost ? "-$" + fmt(r.cost) + " · " : ""}mutluluk +${r.hap}`, "#43c06a"); SND.play("hearts");
+    const ac = kidActors.find(x => x.k === k); if (ac){ ac.jump = 2; const q = ac.sim.root.position; try { confettiHearts(q.x, 1.6, q.z); } catch(e){} } }
+  else { k.hap = Math.max(0, k.hap - 6); flash(`😕 ${k.name}: "Ama söz vermiştin…"`, "#e9555b"); }
+  k.req = null; writeSave(); try { questTick(); } catch(e){} return true;
+}
+function showKidReq(k, back){
+  const r = k.req, st = kidStage(k);
+  if (!r){ modal(`<div class="ev-ic">${st[0]}</div><h2>${escapeHtml(k.name)}</h2><p>Şu an bir isteği yok, odasında oynuyor. Mutluluk %${Math.round(k.hap)}</p><div class="btns"><button id="krHug">🤗 Sarıl</button><button class="sec" id="krB">Tamam</button></div>`);
+    on("krB", () => back ? back() : closeOverlay()); on("krHug", () => { if (k.hug !== save.day){ k.hug = save.day; k.hap = Math.min(100, k.hap + 5); writeSave(); SND.play("hearts"); } back ? back() : closeOverlay(); }); return; }
+  modal(`<div class="ev-ic">${r.ic}</div><h2>${escapeHtml(k.name)} bir şey istiyor</h2><p>${st[0]} "${escapeHtml(r.t)}"${r.cost ? ` · <b>$${fmt(r.cost)}</b>` : ""}</p>
+    <div class="btns"><button id="krY" ${save.money >= r.cost ? "" : "disabled"}>${r.cost ? `💵 Tamam ($${fmt(r.cost)})` : "💛 Tamam"}</button><button class="sec" id="krN">Şimdi olmaz</button></div>`);
+  on("krY", () => { if (kidReqAnswer(k, true) !== false) back ? back() : closeOverlay(); });
+  on("krN", () => { kidReqAnswer(k, false); back ? back() : closeOverlay(); });
+}
+/* evde Etkileşim: yakındaki çocuk */
+function kidNear(pos){ let best = null, bd = 1.3; kidActors.forEach(a => { const q = a.sim.root.position, d = Math.hypot(q.x - pos.x, q.z - pos.z); if (d < bd){ bd = d; best = a; } }); return best; }
+/* çocuk giderleri: her gün mama / okul / harçlık, arada beklenmedik masraf */
+function kidCosts(){
+  const ks = save.kids || []; if (!ks.length) return { total: 0, items: [] };
+  const s = lifeScale(), items = [];
+  const base = ks.reduce((a, k) => a + ({ b: 6, c: 10, t: 16 }[kidGroup(k)]), 0); items.push(["👶 Mama, okul, harçlık", Math.round(base * s)]);
+  if (Math.random() < .18){ const ex = [["🩺 Doktor kontrolü", 25], ["🎒 Okul kırtasiyesi", 18], ["👕 Yeni kıyafetler", 30], ["🦷 Diş hekimi", 40], ["🎟️ Okul etkinliği", 15]][ri(5)]; items.push([ex[0], Math.round(ex[1] * s * ks.length)]); }
+  return { total: items.reduce((a, i) => a + i[1], 0), items };
 }
 const canHaveKid = () => (save.home.type || "studio") !== "studio";
 function showFamily(){
   const kids = save.kids || (save.kids = []), s = lifeScale(), babyCost = Math.round(300 * s);
   modal(`<h2>👶 Aile <span class="money">💵 $${fmt(save.money)}</span></h2>
     ${kids.length ? `<div class="cards">${kids.map((k, i) => { const st = kidStage(k), age = save.day - k.born;
-      return `<div class="card"><div class="ic">${st[0]}</div><b>${escapeHtml(k.name)}</b><small>${st[1]} · ${age} günlük · mutluluk %${Math.round(k.hap)}</small><div class="bar"><i style="width:${Math.round(k.hap)}%"></i></div>
+      return `<div class="card"><div class="ic">${st[0]}</div><b>${escapeHtml(k.name)}</b><small>${st[1]} · ${age} günlük · mutluluk %${Math.round(k.hap)}</small><div class="bar"><i style="width:${Math.round(k.hap)}%"></i></div>${k.req ? `<button class="kreq" data-kr="${i}">💭 ${k.req.ic} ${escapeHtml(k.req.t)}${k.req.cost ? " · $" + fmt(k.req.cost) : ""}</button>` : ""}
         <div class="stbtn"><button data-kc="${i}:feed" ${k.fed === save.day ? "disabled" : ""}>🍼 Besle ($${fmt(Math.round(8 * s))})</button><button class="sec" data-kc="${i}:play" ${k.played === save.day ? "disabled" : ""}>🧸 Oyna</button><button class="sec" data-kc="${i}:read" ${k.read === save.day ? "disabled" : ""}>📚 ${st[1] === "Bebek" ? "Ninni söyle" : st[1] === "Çocuk" ? "Masal oku" : "Ödevine yardım et"}</button></div></div>`; }).join("")}</div>` : `<p>Henüz çocuğunuz yok.</p>`}
-    <div class="tipbox">Çocuklar her gün biraz ilgi bekler. Mutlulukları %30'un altına düşerse evin ruh hali düşer. Büyüdükçe (bebek → çocuk → genç) evde size eşlik ederler.</div>
+    <div class="tipbox">Çocuklar kendi odalarında (tek kişilik yataklı oda) takılır; bir isteği olunca 💭 ile yanına gelir: yanına git ve Etkileşim'e bas. Mama, okul ve harçlık her vardiya sonu giderlere yazılır. Çocuklar her gün biraz ilgi bekler. Mutlulukları %30'un altına düşerse evin ruh hali düşer. Büyüdükçe (bebek → çocuk → genç) evde size eşlik ederler.</div>
     <div class="btns"><button class="sec" id="fmB">← Geri</button>${kids.length < 3 ? `<button id="fmBaby" ${canHaveKid() && save.money >= babyCost ? "" : "disabled"}>${canHaveKid() ? (isCouple() ? `👶 Bebek sahibi olalım ($${fmt(babyCost)})` : `🧸 Evlat edin ($${fmt(babyCost)})`) : "👶 Çocuk için önce stüdyodan büyük bir ev al"}</button>` : ""}</div>`, true);
   on("fmB", closeOverlay);
   on("fmBaby", () => { if (save.money < babyCost || !canHaveKid()) return; save.money -= babyCost; const body = Math.random() < .5 ? "f" : "m", nm = KID_NAMES[body][ri(6)];
@@ -12018,6 +12332,7 @@ function showFamily(){
     kids.push({ name: nm, born: save.day, hap: 85, look: { body, skin: par.skin, hairStyle: body === "f" ? "ponytail" : "short", hairColor: par.hairColor, shirt: ri(CLOTH.length), pants: ri(PANTS.length), eye: par.eye, beard: "none", bottom: "pants" } });
     save.mood = Math.min(100, save.mood + 25); addDiamonds(3, "aile büyüdü"); writeSave(); SND.play("fanfare"); closeOverlay(); setTimeout(questTick, 100);
     cine("AİLE BÜYÜYOR", `${nm} dünyaya geldi! 👶`, "Ona iyi bakın: beslemek, oynamak ve ninni her gün mutluluğunu artırır.", () => { spawnKids(); showFamily(); }, 2800); confettiHearts(cam.target.x, 2, cam.target.z); });
+  overlay.querySelectorAll("[data-kr]").forEach(b => b.onclick = () => { const k = kids[+b.dataset.kr]; if (k) showKidReq(k, () => showFamily()); });
   overlay.querySelectorAll("[data-kc]").forEach(b => b.onclick = () => { const [i, a] = b.dataset.kc.split(":"), k = kids[+i]; if (!k) return;
     if (a === "feed"){ const c = Math.round(8 * s); if (save.money < c) return; save.money -= c; k.fed = save.day; k.hap = Math.min(100, k.hap + 20); }
     else if (a === "play"){ k.played = save.day; k.hap = Math.min(100, k.hap + 25); save.mood = Math.min(100, save.mood + 6); const ac = kidActors.find(x => x.k === k); if (ac) ac.jump = 2; }
@@ -12026,7 +12341,9 @@ function showFamily(){
 }
 /* her gün: çocukların mutluluğu biraz düşer; doğum günleri */
 function familyDay(){
-  (save.kids || []).forEach(k => { k.hap = Math.max(0, k.hap - 12); });
+  (save.kids || []).forEach(k => { k.hap = Math.max(0, k.hap - 12);
+    if (k.req && save.day - k.req.d >= 2){ k.hap = Math.max(0, k.hap - 8); k.req = null; }      // unutulan istek kırgınlık yapar
+    if (!k.req && Math.random() < .6) newKidReq(k); });
   const sad = (save.kids || []).filter(k => k.hap < 30);
   if (sad.length) save.mood = Math.max(0, save.mood - 8);
   return sad;
@@ -13418,7 +13735,7 @@ const NET = (() => {
 })();
 
 /* ---------- Online menüsü ---------- */
-const NET_BUILD = 46;   // online sürüm uyumu kontrolü
+const NET_BUILD = 48;   // online sürüm uyumu kontrolü
 /* oda kodu: Türkçe klavyede gelen İ/ı/Ö/Ü/Ş/Ç/Ğ harfleri düzeltilir, boşluklar atılır */
 const normCode = v => String(v || "").replace(/[İıi]/g, "I").replace(/[Öö0]/g, "O").replace(/[Üü]/g, "U").replace(/[Şş]/g, "S").replace(/[Çç]/g, "C").replace(/[Ğğ]/g, "G").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);   // online sürüm uyumu kontrolü
 function showNetMenu(){
@@ -13497,6 +13814,148 @@ function joinRoom(code){
 }
 
 /* =====================================================================
+   GİRİŞ: Google ile giriş (kayıtlar buluta yedeklenir, başka cihazdan devam)
+   ya da misafir (her şey sadece bu cihazda). Oyun açılır açılmaz ilk ekran.
+   Firebase (Auth + Firestore) sadece Google seçilince yüklenir; internet yoksa
+   oyun misafir gibi çalışmaya devam eder.
+   ===================================================================== */
+const FB_CFG = {
+  apiKey: "AIzaSyBp3s974T3yXLjtx0h-P2a2DbN1WCFQeeM",
+  authDomain: "couple-s-burger-life.firebaseapp.com",
+  projectId: "couple-s-burger-life",
+  storageBucket: "couple-s-burger-life.firebasestorage.app",
+  messagingSenderId: "13664019864",
+  appId: "1:13664019864:web:6a2c667be70b6b5b6437ed",
+  measurementId: "G-2KSSDXN332"
+};
+const FB_V = "10.12.2";
+const AUTH = { fb: null, user: null, loading: null, pushT: null, busy: false, lastPush: 0 };
+const authInfo = () => prefs.auth || null;
+function loadScript(src){ return new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = () => rej(new Error("yüklenemedi: " + src)); document.head.appendChild(s); }); }
+function fbLoad(){
+  if (AUTH.fb) return Promise.resolve(AUTH.fb);
+  if (AUTH.loading) return AUTH.loading;
+  const base = `https://www.gstatic.com/firebasejs/${FB_V}/`;
+  AUTH.loading = loadScript(base + "firebase-app-compat.js").then(() => Promise.all([loadScript(base + "firebase-auth-compat.js"), loadScript(base + "firebase-firestore-compat.js")]))
+    .then(() => { const fb = window.firebase; if (!fb.apps.length) fb.initializeApp(FB_CFG); AUTH.fb = fb;
+      fb.auth().onAuthStateChanged(u => { AUTH.user = u; if (u) authSetUser(u); });
+      return fb; })
+    .catch(e => { AUTH.loading = null; throw e; });
+  return AUTH.loading;
+}
+function authSetUser(u){
+  const a = prefs.auth || {}; prefs.auth = { mode: "google", uid: u.uid, name: u.displayName || (u.email || "").split("@")[0], email: u.email || "", photo: u.photoURL || "", t: a.t || Date.now() }; writePrefs();
+  const chip = document.getElementById("acctChip"); if (chip) chip.outerHTML = acctChipHTML();
+}
+const gLogo = `<svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg>`;
+/* ilk ekran */
+function showLogin(after){
+  modal(`<div class="ttl-logo"><img class="ttl-img" src="${LOGO_MENU_URI}" alt="Couple's Burger Life"><div class="ttl-1">COUPLE'S</div><div class="ttl-2">BURGER<br>LIFE</div><div class="ttl-rib">COOKING</div></div>
+    <div class="ttl-btns login-btns">
+      <button class="t-google" id="lgGoogle">${gLogo}<span class="tb-t">GOOGLE İLE GİRİŞ<small>Kayıtların buluta yedeklenir, her cihazda devam</small></span></button>
+      <button class="t-guest" id="lgGuest">${pic("play")}<span class="tb-t">MİSAFİR GİRİŞİ<small>Hesapsız: kayıt sadece bu cihazda</small></span></button>
+    </div>
+    <p class="ttl-ver" id="lgMsg">Sonradan ⚙️ Ayarlar › Hesap'tan Google'a bağlanabilirsin.</p>`);
+  overlay.firstElementChild.classList.add("title", "login"); overlay.classList.add("title-ov");
+  on("lgGuest", () => { prefs.auth = { mode: "guest", t: Date.now() }; writePrefs(); SND.play("tick"); (after || showMenu)(); });
+  on("lgGoogle", () => googleSignIn(after));
+}
+function googleSignIn(after){
+  const msg = t => { const el = document.getElementById("lgMsg"); if (el) el.innerHTML = t; else flash(t.replace(/<[^>]+>/g, ""), "#7C5CE0"); };
+  if (AUTH.busy) return; AUTH.busy = true; msg("⏳ Google'a bağlanılıyor…");
+  fbLoad().then(fb => { const prov = new fb.auth.GoogleAuthProvider(); prov.setCustomParameters({ prompt: "select_account" });
+      return fb.auth().signInWithPopup(prov).catch(e => { if (["auth/popup-blocked", "auth/operation-not-supported-in-this-environment", "auth/cancelled-popup-request"].includes(e.code)){ msg("↪️ Google sayfasına yönlendiriliyorsun…"); try { sessionStorage.setItem("bbRedir", "1"); } catch(_){} return fb.auth().signInWithRedirect(prov).then(() => null); } throw e; }); })
+    .then(r => { AUTH.busy = false; if (!r || !r.user) return; authSetUser(r.user); SND.play("levelup"); flash(`✅ Hoş geldin ${prefs.auth.name}!`, "#43c06a"); cloudPull(true, after); })
+    .catch(e => { AUTH.busy = false; console.warn("google giriş", e);
+      const why = e && e.code === "auth/unauthorized-domain" ? "Bu adres Firebase'de izinli değil (Authorized domains)." : e && e.code === "auth/popup-closed-by-user" ? "Giriş penceresi kapatıldı." : e && e.code === "auth/network-request-failed" ? "İnternet bağlantısı yok." : e && e.code === "auth/operation-not-allowed" ? "Firebase'de Google girişi açık değil." : "Giriş yapılamadı" + (e && e.code ? " (" + e.code + ")" : "") + ".";
+      msg(`⚠️ ${why} İstersen misafir olarak oyna.`); SND.play("error"); });
+}
+/* ---------- bulut kaydı: bütün kayıtlar sıkıştırılıp tek belgeye ---------- */
+async function zipStr(t){ if (!window.CompressionStream) return "R:" + t; const st = new Blob([t]).stream().pipeThrough(new CompressionStream("deflate-raw")); const u = new Uint8Array(await new Response(st).arrayBuffer()); let s = ""; for (let i = 0; i < u.length; i += 32768) s += String.fromCharCode.apply(null, u.subarray(i, i + 32768)); return "Z:" + btoa(s); }
+async function unzipStr(t){ if (t.startsWith("R:")) return t.slice(2); const u = Uint8Array.from(atob(t.slice(2)), c => c.charCodeAt(0)); const st = new Blob([u]).stream().pipeThrough(new DecompressionStream("deflate-raw")); return await new Response(st).text(); }
+function localPack(onlyCur){
+  const o = {};
+  for (let i = 0; i < localStorage.length; i++){ const k = localStorage.key(i); if (!k || !k.startsWith(SAVE_KEY) || k.endsWith(":bak") || k === PREFS_KEY || k.includes(":slot:test")) continue; if (onlyCur && k.startsWith(SLOT_PREFIX) && k !== SLOT_PREFIX + curSlot) continue; o[k] = localStorage.getItem(k); }
+  const p = Object.assign({}, prefs); delete p.auth; o[PREFS_KEY] = JSON.stringify(p);
+  return o;
+}
+function cloudSummary(){ const ix = slotIndex(); const b = ix[0]; return b ? `${(b.names || []).join(" & ")} · Lv${b.level} · Gün ${b.day} · $${fmt(b.money || 0)}` : "kayıt yok"; }
+async function cloudPush(force){
+  const a = authInfo(); if (!a || a.mode !== "google" || !AUTH.user || AUTH.pushing) return false;
+  if (previewBackup || (typeof NET !== "undefined" && NET.role === "guest")) return false;
+  AUTH.pushing = true;
+  try {
+    let data = await zipStr(JSON.stringify(localPack(false)));
+    if (data.length > 900000) data = await zipStr(JSON.stringify(localPack(true)));          // çok büyükse sadece açık kayıt
+    await AUTH.fb.firestore().collection("users").doc(AUTH.user.uid).set({ t: Date.now(), v: 1, data, sum: cloudSummary(), name: a.name || "" });
+    AUTH.lastPush = Date.now(); prefs.cloudT = AUTH.lastPush; writePrefs(); AUTH.pushing = false;
+    if (force) flash("☁️ Kayıtların buluta yedeklendi", "#43c06a");
+    return true;
+  } catch(e){ AUTH.pushing = false; console.warn("bulut yedek", e); if (force) flash("⚠️ Buluta yedeklenemedi" + (e && e.code === "permission-denied" ? " (Firestore kuralları)" : ""), "#e9555b"); return false; }
+}
+function cloudSoon(){ const a = authInfo(); if (!a || a.mode !== "google") return; clearTimeout(AUTH.pushT); AUTH.pushT = setTimeout(() => cloudPush(false), Date.now() - AUTH.lastPush > 60000 ? 4000 : 20000); }
+/* girişte: bulutta kayıt varsa sor (bulut / bu cihaz) */
+async function cloudPull(ask, after){
+  const go = () => (after || showMenu)();
+  try {
+    const doc = await AUTH.fb.firestore().collection("users").doc(AUTH.user.uid).get();
+    if (!doc.exists){ await cloudPush(false); flash("☁️ Bu cihazdaki kayıtların buluta yedeklendi", "#43c06a"); go(); return; }
+    const c = doc.data(), localHas = slotIndex().length > 0, same = prefs.cloudT && Math.abs(prefs.cloudT - c.t) < 2000;
+    if (same){ go(); return; }
+    if (!localHas){ await cloudApply(c); return; }
+    modal(`<div class="ev-ic">☁️</div><h2>Bulutta kayıt bulundu</h2>
+      <div class="cards"><div class="card"><div class="ic">☁️</div><b>Buluttaki</b><small>${escapeHtml(c.sum || "")}<br>${new Date(c.t).toLocaleString("tr-TR")}</small><button id="cpCloud">Bunu yükle</button></div>
+        <div class="card"><div class="ic">📱</div><b>Bu cihazdaki</b><small>${escapeHtml(cloudSummary())}</small><button class="sec" id="cpLocal">Bunu kullan</button></div></div>
+      <p class="small">"Bunu yükle" bu cihazdaki kayıtları buluttakiyle değiştirir. "Bunu kullan" bu cihazdakini buluta yazar.</p>`);
+    on("cpCloud", () => cloudApply(c));
+    on("cpLocal", async () => { await cloudPush(true); go(); });
+  } catch(e){ console.warn("bulut okuma", e); flash("⚠️ Buluta ulaşılamadı" + (e && e.code === "permission-denied" ? " (Firestore kuralları)" : "") + " · bu cihazdaki kayıtla devam", "#e9555b"); go(); }
+}
+async function cloudApply(c){
+  try {
+    const o = JSON.parse(await unzipStr(c.data));
+    Object.keys(localStorage).filter(k => k.startsWith(SLOT_PREFIX) && !k.endsWith(":bak")).forEach(k => { try { localStorage.setItem(k + ":bak", localStorage.getItem(k)); } catch(e){} });
+    const keepAuth = prefs.auth;
+    Object.entries(o).forEach(([k, v]) => { try { localStorage.setItem(k, v); } catch(e){} });
+    try { const p = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}"); p.auth = keepAuth; p.cloudT = c.t; localStorage.setItem(PREFS_KEY, JSON.stringify(p)); } catch(e){}
+    modal(`<div class="ev-ic">✅</div><h2>Kayıtların yüklendi</h2><p>${escapeHtml(c.sum || "")}</p><div class="btns"><button id="caOk">Oyuna gir</button></div>`);
+    on("caOk", () => location.reload());
+  } catch(e){ console.warn(e); flash("⚠️ Bulut kaydı açılamadı", "#e9555b"); showMenu(); }
+}
+/* hesap penceresi (Ayarlar ve menüdeki hesap rozetinden) */
+function showAccount(back){
+  const a = authInfo() || { mode: "guest" }, g = a.mode === "google";
+  modal(`<h2>👤 Hesap</h2>
+    ${g ? `<div class="acct-card">${a.photo ? `<img src="${escapeHtml(a.photo)}" alt="" referrerpolicy="no-referrer">` : `<i>👤</i>`}<div><b>${escapeHtml(a.name || "")}</b><small>${escapeHtml(a.email || "")}</small><small>☁️ Son yedek: ${prefs.cloudT ? new Date(prefs.cloudT).toLocaleString("tr-TR") : "henüz yok"}</small></div></div>
+      <div class="act-grid"><button id="acPush">☁️ Şimdi yedekle</button><button class="sec" id="acPull">⬇️ Buluttan yükle</button><button class="danger" id="acOut">🚪 Çıkış yap</button></div>`
+    : `<p>Şu an <b>misafir</b> olarak oynuyorsun: kayıtların sadece bu cihazda. Google ile bağlanırsan kayıtların buluta yedeklenir; telefon değişse de kaldığın yerden devam edersin.</p>
+      <div class="act-grid"><button class="t-google" id="acGoogle">${gLogo} Google ile bağlan</button></div><p class="small" id="lgMsg"></p>`}
+    <div class="btns"><button class="sec" id="acB">← Geri</button></div>`);
+  on("acB", () => back ? back() : showMenu());
+  on("acGoogle", () => googleSignIn(() => showAccount(back)));
+  on("acPush", () => fbLoad().then(() => waitUser()).then(() => cloudPush(true)).then(() => showAccount(back)));
+  on("acPull", () => fbLoad().then(() => waitUser()).then(async () => { const d = await AUTH.fb.firestore().collection("users").doc(AUTH.user.uid).get(); if (!d.exists){ flash("Bulutta kayıt yok", "#e9555b"); return; } cloudApply(d.data()); }).catch(() => flash("⚠️ Buluta ulaşılamadı", "#e9555b")));
+  on("acOut", () => { const done = () => { prefs.auth = null; prefs.cloudT = null; writePrefs(); showLogin(); }; if (AUTH.fb) AUTH.fb.auth().signOut().then(done, done); else done(); });
+}
+function waitUser(){ return new Promise((res, rej) => { if (AUTH.user) return res(AUTH.user); let n = 0; const t = setInterval(() => { if (AUTH.user){ clearInterval(t); res(AUTH.user); } else if (++n > 40){ clearInterval(t); rej(new Error("oturum yok")); } }, 150); }); }
+const acctChipHTML = () => { const a = authInfo(); if (!a) return ""; const g = a.mode === "google";
+  return `<button class="acct-chip" id="acctChip">${g && a.photo ? `<img src="${escapeHtml(a.photo)}" alt="" referrerpolicy="no-referrer">` : g ? "👤" : "🎮"} ${g ? escapeHtml((a.name || "").split(" ")[0]) : "Misafir"}${g ? " ☁️" : ""}</button>`; };
+/* açılış: daha önce seçim yapılmadıysa giriş ekranı; Google ise oturumu sessizce yenile */
+function authBoot(){
+  try { if (!prefs.auth && navigator.webdriver && !/[?&]login=1/.test(location.search)){ prefs.auth = { mode: "guest", t: Date.now(), auto: 1 }; writePrefs(); } } catch(e){}      // otomatik testler giriş ekranını atlar
+  const a = authInfo();
+  let redir = false; try { redir = sessionStorage.getItem("bbRedir") === "1"; sessionStorage.removeItem("bbRedir"); } catch(e){}
+  if (!a && redir){ showLogin(); const m = document.getElementById("lgMsg"); if (m) m.textContent = "⏳ Google girişi tamamlanıyor…";
+    fbLoad().then(fb => fb.auth().getRedirectResult()).then(r => { if (r && r.user){ authSetUser(r.user); cloudPull(true); } else if (m) m.textContent = "Giriş tamamlanamadı, tekrar dene ya da misafir oyna."; }).catch(() => { if (m) m.textContent = "⚠️ Giriş tamamlanamadı."; }); return; }
+  if (!a){ showLogin(); return; }
+  showMenu();
+  if (a.mode === "google") fbLoad().then(fb => fb.auth().getRedirectResult().then(r => { if (r && r.user){ authSetUser(r.user); cloudPull(true); } }).catch(() => {}))
+    .then(() => waitUser()).then(() => { if (Date.now() - (prefs.cloudT || 0) > 3600e3) cloudPush(false); }).catch(e => console.warn("oturum", e));
+}
+addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden" && AUTH.user && Date.now() - AUTH.lastPush > 30000) cloudPush(false); });
+document.addEventListener("click", e => { const c = e.target.closest && e.target.closest("#acctChip"); if (c){ e.preventDefault(); showAccount(() => showMenu()); } });
+
+/* =====================================================================
    BAŞLANGIÇ
    ===================================================================== */
 (() => {     // açılış ekranı: logo, kısa yükleme, sonra menü
@@ -13511,7 +13970,7 @@ buildVenue();
 resize();
 createPlayers(1, true);
 focusCam();
-showMenu();
+authBoot();
 requestAnimationFrame(loop);
 setInterval(() => document.body.classList.toggle("testmode", isTest()), 500);
 /* otomatik test kancası (oyuna etkisi yok) */
