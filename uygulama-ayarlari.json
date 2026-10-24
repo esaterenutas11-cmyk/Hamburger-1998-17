@@ -1,0 +1,23 @@
+{
+  "_aciklama": "Mağaza derlemesinin TEK ayar dosyası. Boş bırakılan özellik uygulamaya eklenmez (uygulama yine de çalışır).",
+  "uygulamaAdi": "Couple's Burger Life",
+  "paketAdi": "com.esat.burgerbiz",
+  "surum": "1.0.0",
+  "surumKoduBaslangic": 1,
+  "admob": {
+    "_aciklama": "admob.google.com'da uygulamayı ekleyince verilen kimlikler. Boşsa reklam SDK'sı eklenmez, reklamlı ödüller oyunun kendi sponsor ekranıyla verilir.",
+    "androidAppId": "",
+    "androidOdulluReklam": "",
+    "iosAppId": "",
+    "iosOdulluReklam": "",
+    "testModu": false
+  },
+  "giris": {
+    "_aciklama": "firebase/ klasörüne google-services.json (Android) ve GoogleService-Info.plist (iOS) konunca yerel Google girişi açılır. iOS'ta Google ile birlikte Apple girişi de zorunludur.",
+    "google": true,
+    "apple": true
+  },
+  "ios": {
+    "takimKimligi": ""
+  }
+}

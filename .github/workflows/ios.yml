@@ -1,0 +1,80 @@
+# iOS derlemesi. App Store Connect API anahtarı gizli değişkenleri girildiyse
+# derler, imzalar ve DOĞRUDAN App Store Connect'e (TestFlight) yükler.
+# Anahtar yoksa sadece simülatör için derleyip hatasız derlendiğini kontrol eder.
+name: iOS derleme
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, magaza]
+    paths-ignore: ["magaza/**", "**.md"]
+
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      BUILD_NUMBER: ${{ github.run_number }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.APPSTORE_API_KEY_P8_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Xcode seç (26+)
+        run: |
+          X=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          [ -n "$X" ] && sudo xcode-select -s "$X"
+          xcodebuild -version
+
+      - name: Paketler
+        run: |
+          npm install --no-audit --no-fund
+          node scripts/native-setup.mjs deps
+
+      - name: iOS projesi
+        run: |
+          rm -rf ios
+          npx cap add ios --packagemanager CocoaPods
+          node scripts/native-setup.mjs ios
+          ruby scripts/ios-project.rb "$APPLE_TEAM_ID"
+          npx cap sync ios
+
+      - name: Simülatör derlemesi (kontrol)
+        if: env.ASC_KEY_ID == ''
+        working-directory: ios/App
+        run: |
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build | tail -20
+          echo "::notice::iOS derlemesi hatasız. App Store'a yüklemek için APPSTORE_API_* ve APPLE_TEAM_ID gizli değişkenlerini ekle."
+
+      - name: App Store için derle, imzala, yükle
+        if: env.ASC_KEY_ID != ''
+        working-directory: ios/App
+        run: |
+          mkdir -p ~/private_keys
+          echo "$ASC_KEY_P8" | base64 -d > ~/private_keys/AuthKey_$ASC_KEY_ID.p8
+          AUTH="-allowProvisioningUpdates -authenticationKeyPath $HOME/private_keys/AuthKey_$ASC_KEY_ID.p8 -authenticationKeyID $ASC_KEY_ID -authenticationKeyIssuerID $ASC_ISSUER_ID"
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            DEVELOPMENT_TEAM=$APPLE_TEAM_ID CODE_SIGN_STYLE=Automatic $AUTH archive | tail -30
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict></plist>
+          EOF
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/App.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" -exportPath "$RUNNER_TEMP/export" $AUTH | tail -30
+          echo "::notice::Derleme App Store Connect'e yüklendi. 10-30 dk içinde TestFlight'ta görünür."

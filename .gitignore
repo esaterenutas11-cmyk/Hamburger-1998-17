@@ -1,0 +1,9 @@
+node_modules/
+android/
+ios/
+imza/
+*.jks
+*.keystore
+*.p8
+cikti/
+.DS_Store

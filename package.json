@@ -1,0 +1,27 @@
+{
+  "name": "couples-burger-life",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Couple's Burger Life: Cooking – Android, Android TV ve iOS uygulaması (Capacitor 8)",
+  "scripts": {
+    "test:web": "node scripts/check-web.mjs",
+    "setup:deps": "node scripts/native-setup.mjs deps",
+    "android": "npx cap add android && node scripts/native-setup.mjs android && npx cap sync android",
+    "ios": "npx cap add ios --packagemanager CocoaPods && node scripts/native-setup.mjs ios && npx cap sync ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/ios": "^8.0.0",
+    "@capacitor/splash-screen": "^8.0.0",
+    "@capacitor/status-bar": "^8.0.0",
+    "cordova-plugin-purchase": "^13.12.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
