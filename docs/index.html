@@ -14223,8 +14223,10 @@ async function cloudApply(c, auto){
     const keepAuth = prefs.auth;
     Object.entries(o).forEach(([k, v]) => { try { localStorage.setItem(k, v); } catch(e){} });
     try { const p = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}"); p.auth = keepAuth; p.cloudT = c.t; p.localT = c.t; localStorage.setItem(PREFS_KEY, JSON.stringify(p)); } catch(e){}
-    modal(`<div class="ev-ic">✅</div><h2>${auto ? "Diğer cihazdaki ilerlemen yüklendi" : "Kayıtların yüklendi"}</h2><p>${escapeHtml(c.sum || "")}</p><div class="btns"><button id="caOk">Oyuna gir</button></div>`);
-    on("caOk", () => location.reload());
+    // yüklenen kayıt hemen açılsın: sayfa yenilenince giriş ekranı/menü atlanır, en son oynanan oyun devam eder
+    try { sessionStorage.setItem("cblAutoPlay", "1"); } catch(e){}
+    modal(`<div class="ev-ic">✅</div><h2>${auto ? "Diğer cihazdaki ilerlemen yüklendi" : "Kayıtların yüklendi"}</h2><p>${escapeHtml(c.sum || "")}</p><p>⏳ Oyun açılıyor…</p>`);
+    setTimeout(() => location.reload(), 700);
   } catch(e){ console.warn(e); flash("⚠️ Bulut kaydı açılamadı", "#e9555b"); showMenu(); }
 }
 /* hesap penceresi (Ayarlar ve menüdeki hesap rozetinden) */
@@ -14272,6 +14274,17 @@ function waitUser(){ return new Promise((res, rej) => { if (AUTH.user) return re
 const acctChipHTML = () => { const a = authInfo(); if (!a) return ""; const g = a.mode === "google";
   return `<button class="acct-chip" id="acctChip">${g && a.photo ? `<img src="${escapeHtml(a.photo)}" alt="" referrerpolicy="no-referrer">` : g ? "👤" : "🎮"} ${g ? escapeHtml((a.name || "").split(" ")[0]) : "Misafir"}${g ? " ☁️" : ""}</button>`; };
 /* açılış: daha önce seçim yapılmadıysa giriş ekranı; Google ise oturumu sessizce yenile */
+/* en son oynanan kaydı (hikâye ya da aynı cihaz ikili) doğrudan aç */
+function autoPlayLatest(){
+  try {
+    const ix = slotIndex().filter(x => x.kind === "story" || x.kind === "duo").sort((a, b) => (b.t || 0) - (a.t || 0)), x = ix[0];
+    if (!x){ showMenu(); return; }
+    if (x.kind === "duo"){ useSlot(x.id, "duo"); beginGame(2); return; }
+    useSlot("story", "story"); storyMigrate();
+    if (save.shifts > 0 || save.level > 1) beginGame(1); else showMenu();
+    flash("☁️ Buluttaki oyunun açıldı", "#43c06a");
+  } catch(e){ console.warn("otomatik açılış", e); showMenu(); }
+}
 function authBoot(){
   try { if (!prefs.auth && navigator.webdriver && !/[?&]login=1/.test(location.search)){ prefs.auth = { mode: "guest", t: Date.now(), auto: 1 }; writePrefs(); } } catch(e){}      // otomatik testler giriş ekranını atlar
   const a = authInfo();
@@ -14279,6 +14292,12 @@ function authBoot(){
   if (!a && redir){ showLogin(); const m = document.getElementById("lgMsg"); if (m) m.textContent = "⏳ Google girişi tamamlanıyor…";
     fbLoad().then(fb => fb.auth().getRedirectResult()).then(r => { if (r && r.user){ authSetUser(r.user); cloudPull(true); } else if (m) m.textContent = "Giriş tamamlanamadı, tekrar dene ya da misafir oyna."; }).catch(() => { if (m) m.textContent = "⚠️ Giriş tamamlanamadı."; }); return; }
   if (a && a.auto){ showMenu(); return; }                  // sadece otomatik testler
+  let auto = false; try { auto = sessionStorage.getItem("cblAutoPlay") === "1"; sessionStorage.removeItem("cblAutoPlay"); } catch(e){}
+  if (auto && a){                                          // buluttan yeni yüklendi: doğrudan oyuna gir
+    autoPlayLatest();
+    if (a.mode === "google") fbLoad().then(() => waitUser()).catch(e => console.warn("oturum", e));
+    return;
+  }
   showLogin();                                             // her açılışta sor
   if (a && a.mode === "google") fbLoad().then(fb => fb.auth().getRedirectResult().then(r => { if (r && r.user){ authSetUser(r.user); cloudPull(true); } }).catch(() => {}))
     .then(() => waitUser()).catch(e => console.warn("oturum", e));     // açılışta körlemesine buluta yazma YOK (diğer cihazın kaydını silerdi): senkron girişte yapılır
