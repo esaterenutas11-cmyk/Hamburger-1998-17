@@ -1452,7 +1452,7 @@ function defaultSave(){
 const SLOT_PREFIX = SAVE_KEY + ":slot:", INDEX_KEY = SAVE_KEY + ":index", PREFS_KEY = SAVE_KEY + ":prefs";
 const defPrefs = () => ({ muted: false, hintMode: "auto", learned: {}, diamonds: 10, wheelDay: "", adDay: "", adCount: 0, migrated: false });
 let prefs = (() => { try { return Object.assign(defPrefs(), JSON.parse(localStorage.getItem(PREFS_KEY)) || {}); } catch(e){ return defPrefs(); } })();
-function writePrefs(){ try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch(e){} }
+function writePrefs(){ if (window.__cloudLock) return; try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch(e){} }
 function slotIndex(){ try { const a = JSON.parse(localStorage.getItem(INDEX_KEY)); return Array.isArray(a) ? a.filter(x => x && x.id !== "test" && x.kind !== "test") : []; } catch(e){ return []; } }
 function writeIndex(a){ try { localStorage.setItem(INDEX_KEY, JSON.stringify(a)); } catch(e){} }
 /* güncellemeden sonra eski kayıtlar bozulmasın: eksik alanları varsayılanlarla doldur, bozuk alanları onar */
@@ -1544,7 +1544,7 @@ addEventListener("visibilitychange", () => { try { if (document.visibilityState 
 function useTempSlot(){ curSlot = null; save = applyPrefs(clone(save)); }
 function deleteSlot(id){ try { localStorage.removeItem(SLOT_PREFIX + id); localStorage.removeItem(SLOT_PREFIX + id + ":bak"); } catch(e){} writeIndex(slotIndex().filter(x => x.id !== id)); }
 function writeSave(){
-  if (previewBackup) return;
+  if (previewBackup || window.__cloudLock) return;          // buluttan yükleme sürerken bu cihazdaki eski kayıt üstüne yazılmasın
   if (save && !isFinite(save.money)){ console.warn("money NaN düzeltildi"); save.money = 0; }
   if (save && !isFinite(save.diamonds)) save.diamonds = 0;
   prefs.muted = !!save.muted; prefs.hintMode = save.hintMode || "auto"; prefs.learned = save.learned || prefs.learned;
@@ -14173,7 +14173,7 @@ function localPack(onlyCur){
 }
 function cloudSummary(){ const ix = slotIndex(); const b = ix[0]; return b ? `${(b.names || []).join(" & ")} · Lv${b.level} · Gün ${b.day} · $${fmt(b.money || 0)}` : "kayıt yok"; }
 async function cloudPush(force){
-  const a = authInfo(); if (!a || a.mode !== "google" || !AUTH.user || AUTH.pushing) return false;
+  const a = authInfo(); if (window.__cloudLock || !a || a.mode !== "google" || !AUTH.user || AUTH.pushing) return false;
   if (previewBackup || (typeof NET !== "undefined" && NET.role === "guest")) return false;
   AUTH.pushing = true;
   try {
@@ -14219,6 +14219,9 @@ async function cloudPull(ask, after){
 async function cloudApply(c, auto){
   try {
     const o = JSON.parse(await unzipStr(c.data));
+    // ÖNEMLİ: buradan sonra sayfa yenilenene kadar oyun hiçbir şey kaydetmez. Yoksa açık olan eski oyun
+    // (ör. "Oyuncu 1 · $0") yüklenen bulut kaydının üstüne yazıyor, sonraki girişte yine "iki cihazda da oynanmış" çıkıyordu.
+    window.__cloudLock = true; clearTimeout(AUTH.pushT);
     Object.keys(localStorage).filter(k => k.startsWith(SLOT_PREFIX) && !k.endsWith(":bak")).forEach(k => { try { localStorage.setItem(k + ":bak", localStorage.getItem(k)); } catch(e){} });
     const keepAuth = prefs.auth;
     Object.entries(o).forEach(([k, v]) => { try { localStorage.setItem(k, v); } catch(e){} });
@@ -14227,7 +14230,7 @@ async function cloudApply(c, auto){
     try { sessionStorage.setItem("cblAutoPlay", "1"); } catch(e){}
     modal(`<div class="ev-ic">✅</div><h2>${auto ? "Diğer cihazdaki ilerlemen yüklendi" : "Kayıtların yüklendi"}</h2><p>${escapeHtml(c.sum || "")}</p><p>⏳ Oyun açılıyor…</p>`);
     setTimeout(() => location.reload(), 700);
-  } catch(e){ console.warn(e); flash("⚠️ Bulut kaydı açılamadı", "#e9555b"); showMenu(); }
+  } catch(e){ window.__cloudLock = false; console.warn(e); flash("⚠️ Bulut kaydı açılamadı", "#e9555b"); showMenu(); }
 }
 /* hesap penceresi (Ayarlar ve menüdeki hesap rozetinden) */
 function showAccount(back){
