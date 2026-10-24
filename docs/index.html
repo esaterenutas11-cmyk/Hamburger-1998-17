@@ -12396,8 +12396,8 @@ let qCardOpen = (() => { try { return localStorage.getItem("bbQCard") !== "0"; }
 function questCardHTML(){
   const rs = reqsFor(), done = rs.filter(reqOk).length, L = LV(), tierOk = !!save.tierDone;
   const rows = rs.map(r => { const ok = reqOk(r); return `<div class="qr ${ok ? "ok" : ""}"><i>${ok ? "✔" : "○"}</i><span>${escapeHtml(reqTxt(r))}${reqProg(r) && !ok ? ` <small>${reqProg(r)}</small>` : ""}</span>${ok ? "" : `<button data-qgo="${r.idx}" title="Göster">👉</button>`}</div>`; }).join("");
-  return `<div class="qc-h" id="qcH"><b>📋 Lv${L.n}/30 ${escapeHtml(L.short)} · görevler ${done}/${rs.length}</b><em>${qCardOpen ? "▾" : "▸"}</em></div>
-    ${qCardOpen ? `<div class="qc-b">${rows}<div class="qr ${tierOk ? "ok" : ""}"><i>${tierOk ? "✔" : "○"}</i><span>🎯 ${tierLabel()} · $${fmt(tierTarget())}+ net kâr</span></div>
+  return `<div class="qc-h" id="qcH"><b>📋 Lv${L.n}/30 ${escapeHtml(L.short)} · görevler ${done + (tierOk ? 1 : 0)}/${rs.length + 1}</b><em>${qCardOpen ? "▾" : "▸"}</em></div>
+    ${qCardOpen ? `<div class="qc-b">${rows}<div class="qr ${tierOk ? "ok" : ""}"><i>${tierOk ? "✔" : "○"}</i><span>🎯 ${tierOk ? "3 hedefin hepsi tamam" : `${tierLabel()} · vardiyada $${fmt(tierTarget())}+ net kâr · ${save.tierHits || 0}/${tierHitsNeed()} vardiya`}</span></div>
       <button class="qc-car" data-career="1">🏆 30 restoranın tamamını gör</button><div class="qc-f">${done === rs.length && tierOk ? "🎉 Hepsi tamam! Vardiya sonunda yeni mekân açılır." : "Hepsi + 3 hedef = yeni restoran"}</div></div>` : ""}`;
 }
 function renderQuestCard(){
@@ -12406,7 +12406,7 @@ function renderQuestCard(){
     el.addEventListener("click", e => { e.stopPropagation(); showQuestList(); }); }
   const show = mode === "home" && !overlayOpen() && !document.querySelector(".cine,.paper-ov,.award-ov") && !edit.on && !(WORK) && !(typeof previewBackup !== "undefined" && previewBackup) && NET.role !== "guest";
   el.style.display = show ? "grid" : "none";
-  if (show){ const rs = reqsFor(), done = rs.filter(reqOk).length, h = `<span class="qr-ic">📋</span><b class="qr-n ${done === rs.length ? "ok" : ""}">${done}/${rs.length}</b>`; if (el._h !== h){ el._h = h; el.innerHTML = h; } placeQuestCard(el); }
+  if (show){ const rs = reqsFor(), done = rs.filter(reqOk).length + (save.tierDone ? 1 : 0), tot = rs.length + 1, h = `<span class="qr-ic">📋</span><b class="qr-n ${done === tot ? "ok" : ""}">${done}/${tot}</b>`; if (el._h !== h){ el._h = h; el.innerHTML = h; } placeQuestCard(el); }
 }
 /* görev listesi: yuvarlak 📋 tuşuna basınca açılan pencere */
 function showQuestList(){
@@ -12870,6 +12870,7 @@ function showDoc(url, back){
   on("docB", back); on("docDel", () => showDoc("hesap-silme.html", back));
 }
 function testLogin(back){
+  if (isNativeApp()){ (back || showMenu)(); return; }      // mağaza sürümünde test modu yok
   if (sessionStorage.getItem("cblTest") === "1"){ showTestMenu(); return; }
   modal(`<h2>🧪 Test modu girişi</h2><p>Geliştirici şifresini gir. Test modu ayrı bir kayıtta çalışır; hikâye, ikili ve online kayıtların ile elmasların etkilenmez.</p>
     <div class="netBox"><input id="tPin" type="password" inputmode="numeric" maxlength="8" placeholder="Şifre" autocomplete="off"><button id="tPinGo">Giriş</button></div>
@@ -13062,11 +13063,26 @@ addEventListener("gamepadconnected", e => {
   flash(`🎮 Kol bağlandı (${e.gamepad.index + 1})`, "#3a7be0");
 });
 /* kısa üst bilgi kutusu */
+/* bildirimler: az ve okunur. Aynı mesaj 10 sn içinde tekrar çıkmaz; arka arkaya gelenler sıraya girer (en fazla 2),
+   vardiyada önemsiz bilgi mesajları atlanır, kırmızı (acil) mesajlar her zaman öne geçer */
+const FLASH_URGENT = ["#e9555b", "#EC6B2D"];
 function flash(text, bg){
+  const now = Date.now(), F = flash.st || (flash.st = { seen: {}, q: [], until: 0 });
+  if (!text) return;
+  if (F.seen[text] && now - F.seen[text] < 10000) return;
+  const urgent = FLASH_URGENT.includes(bg);
+  const busy = typeof mode !== "undefined" && mode === "game" && typeof game !== "undefined" && game.running;
+  if (busy && !urgent && /^(✨|💡|➡️|📖|🎓)/.test(text)) return;                   // vardiyada ipucu/duyuru kalabalığı yok
+  if (now < F.until && !urgent){ if (F.q.length < 2 && !F.q.some(x => x[0] === text)) F.q.push([text, bg]); return; }
+  F.seen[text] = now; F.until = now + 2600;
+  flashShow(text, bg);
+}
+function flashShow(text, bg){
   const el = document.getElementById("rush");
   el.textContent = text; el.style.background = bg || "";
   el.style.display = "none"; void el.offsetWidth; el.style.display = "block";
-  clearTimeout(flash.t); flash.t = setTimeout(() => { el.style.display = "none"; el.style.background = ""; }, 2500);
+  clearTimeout(flash.t); flash.t = setTimeout(() => { el.style.display = "none"; el.style.background = "";
+    const F = flash.st, nx = F && F.q.shift(); if (nx){ F.until = 0; setTimeout(() => flash(nx[0], nx[1]), 250); } }, 2500);
 }
 
 /* tam ekran + yatay kilit (tarayıcıda) */
@@ -13982,7 +13998,7 @@ const NET = (() => {
 })();
 
 /* ---------- Online menüsü ---------- */
-const NET_BUILD = 53;   // online sürüm uyumu kontrolü
+const NET_BUILD = 54;   // online sürüm uyumu kontrolü
 /* oda kodu: Türkçe klavyede gelen İ/ı/Ö/Ü/Ş/Ç/Ğ harfleri düzeltilir, boşluklar atılır */
 const normCode = v => String(v || "").replace(/[İıi]/g, "I").replace(/[Öö0]/g, "O").replace(/[Üü]/g, "U").replace(/[Şş]/g, "S").replace(/[Çç]/g, "C").replace(/[Ğğ]/g, "G").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);   // online sürüm uyumu kontrolü
 function showNetMenu(){
