@@ -13982,7 +13982,7 @@ const NET = (() => {
 })();
 
 /* ---------- Online menüsü ---------- */
-const NET_BUILD = 51;   // online sürüm uyumu kontrolü
+const NET_BUILD = 53;   // online sürüm uyumu kontrolü
 /* oda kodu: Türkçe klavyede gelen İ/ı/Ö/Ü/Ş/Ç/Ğ harfleri düzeltilir, boşluklar atılır */
 const normCode = v => String(v || "").replace(/[İıi]/g, "I").replace(/[Öö0]/g, "O").replace(/[Üü]/g, "U").replace(/[Şş]/g, "S").replace(/[Çç]/g, "C").replace(/[Ğğ]/g, "G").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);   // online sürüm uyumu kontrolü
 function showNetMenu(){
