@@ -10,7 +10,7 @@
     "androidOdulluReklam": "",
     "iosAppId": "",
     "iosOdulluReklam": "",
-    "testModu": true
+    "testModu": false
   },
   "giris": {
     "_aciklama": "firebase/ klasörüne google-services.json (Android) ve GoogleService-Info.plist (iOS) konunca yerel Google girişi açılır. iOS'ta Google ile birlikte Apple girişi de zorunludur.",

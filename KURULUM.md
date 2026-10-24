@@ -20,15 +20,11 @@ scripts/              ← derleme sırasında çalışan ayar betikleri
 
 ---
 
-## 1. GitHub'a yükle (5 dk)
+## 1. GitHub (hazır)
 
-1. https://github.com/esaterenutas11-cmyk/Hamburger-1998-17 › **Add file › Upload files**.
-2. Bu zip'in **içindeki her şeyi** (`.github` klasörü dahil) sürükle bırak. Mevcut `index.html`'in üstüne yazılsın.
-   `imza/` klasörünü **yükleme** (gizli anahtarın orada; `.gitignore` zaten engelliyor).
-3. **Commit changes**.
-4. Oyun adresi aynı kalır: `https://esaterenutas11-cmyk.github.io/Hamburger-1998-17/` (otomatik `docs/`'a geçer, kayıtlar silinmez).
-
-> Windows'ta `.github` klasörü görünmüyorsa: Dosya Gezgini › Görünüm › Gizli öğeler.
+Her şey `Hamburger-1998-17` reposuna yüklendi. Tarayıcı sürümü aynı adreste çalışmaya devam eder
+(`https://esaterenutas11-cmyk.github.io/Hamburger-1998-17/` → otomatik `docs/`'a geçer, kayıtlar silinmez).
+`imza/` klasörü repoya **yüklenmedi** (gizli anahtarın): onu sadece sen saklıyorsun.
 
 ## 2. Android imza anahtarını GitHub'a tanıt (3 dk)
 
