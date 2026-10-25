@@ -7,3 +7,7 @@ imza/
 *.p8
 cikti/
 .DS_Store
+
+# Firebase yapılandırma dosyaları repoya konmaz: GitHub gizli değişkenlerinden gelir
+firebase/google-services.json
+firebase/GoogleService-Info.plist

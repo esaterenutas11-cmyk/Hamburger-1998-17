@@ -36,6 +36,15 @@ jobs:
           [ -n "$X" ] && sudo xcode-select -s "$X"
           xcodebuild -version
 
+      - name: Firebase dosyaları (gizli değişkenlerden)
+        env:
+          FB_ANDROID: ${{ secrets.FIREBASE_ANDROID_JSON }}
+          FB_IOS: ${{ secrets.FIREBASE_IOS_PLIST }}
+        run: |
+          mkdir -p firebase
+          if [ -n "$FB_ANDROID" ]; then printf '%s' "$FB_ANDROID" > firebase/google-services.json; echo "✔ google-services.json"; fi
+          if [ -n "$FB_IOS" ]; then printf '%s' "$FB_IOS" > firebase/GoogleService-Info.plist; echo "✔ GoogleService-Info.plist"; fi
+
       - name: Paketler
         run: |
           exec > >(tee -a "$RUNNER_TEMP/derleme.log") 2>&1
