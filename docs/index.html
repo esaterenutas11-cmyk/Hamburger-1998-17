@@ -6688,6 +6688,14 @@ function progressHTML(){
   return `<p style="margin-bottom:4px">Hedef: <b>${L.goalText}</b> · Biriken: <b>$${fmt(save.levelEarn)}</b>${L.needStars ? ` · Yıldız: <b>${stars().toFixed(1)}</b>` : ""}${L.needSpatula ? ` · Eleştiri: <b>${save.critics || 0}/3</b>` : ""}</p><div class="prog"><i style="width:${f * 100}%"></i></div>`;
 }
 function slotLine(x){ return `Lv${x.level} · ${LEVELS[x.level].short} · Gün ${x.day} · $${fmt(x.money)}`; }
+/* kayıtlı hikâye var mı? (buluttan gelen, henüz vardiya yapılmamış ama karakteri kurulmuş kayıt da sayılır) */
+function storyStarted(){
+  try {
+    const s = curSlot === "story" ? save : readSlot("story");
+    if (!s || !readSlot("story")) return false;
+    return s.shifts > 0 || s.level > 1 || s.money !== 0 || !!(s.home && s.home.type) || !!s.tutorialDone || (s.sims[0] && s.sims[0].name !== DEFAULT_SIMS[0].name) || (s.served || 0) > 0;
+  } catch(e){ return false; }
+}
 function showMenu(){
   if (previewBackup){ save = previewBackup; previewBackup = null; }
   exitEditSilently();
@@ -6695,7 +6703,7 @@ function showMenu(){
   if (!net && !waiting && curSlot !== "story") useSlot("story", "story");
   if (mode !== "menu" || !V || V.kind !== "shop"){ clearActors(); buildVenue(); createPlayers(1, true); focusCam(); }
   setMode("menu");
-  const st = slotIndex().find(x => x.id === "story"), started = save.shifts > 0 || save.level > 1;
+  const st = slotIndex().find(x => x.id === "story"), started = storyStarted();
   const duos = slotIndex().filter(x => x.kind === "duo").length, nets = slotIndex().filter(x => x.kind === "net").length;
   const L = LV(), goal = Math.min(1, ((save.tier || 1) - 1 + (save.tierHits || 0) / tierHitsNeed()) / TIERS);
   const wheelNew = prefs.wheelDay !== todayKey();
@@ -6703,7 +6711,7 @@ function showMenu(){
     ${net ? `<div class="ttl-net">🌐 Oda <b>${NET.code}</b> · ${escapeHtml(NET.guestName)} bağlı</div>
       <div class="ttl-btns"><button class="t-go" id="bNetGo">${pic("play")}<span class="tb-t">BİRLİKTE DEVAM</span></button><button class="sec" id="bNet">🔌 BAĞLANTIYI KAPAT</button></div>` : `
     <div class="ttl-btns">
-      <button class="t-play" id="bStory">${pic("play")}<span class="tb-t">${started ? "DEVAM ET" : "OYNA"}<small>${started ? escapeHtml(save.sims[0].name) + " · " + slotLine(st || save) : "Yeni hikâye başlat"}</small></span></button>
+      <button class="t-play" id="bStory">${pic("play")}<span class="tb-t">${started ? "KAYITLI OYUNU BAŞLAT" : "OYNA"}<small>${started ? escapeHtml(save.sims[0].name) + " · " + slotLine(st || save) : "Yeni hikâye başlat"}</small></span></button>
       ${duoAvail() ? `<button class="t-duo" id="bDuo">${pic("duo")}<span class="tb-t">BİRLİKTE<small>Aynı bilgisayar · klavye / kol${duos ? ` · ${duos} kayıtlı ikili` : ""}</small></span></button>` : ""}
       <button class="t-net" id="bNet">${pic("globe")}<span class="tb-t">ONLİNE<small>${waiting ? "Oda " + NET.code + " açık" : nets ? nets + " kayıtlı oda" : "İki telefon, internetten"}</small></span></button>
     </div>`}
@@ -6723,7 +6731,7 @@ function showMenu(){
   on("bSnd", () => { toggleMute(); showMenu(); });
   on("bWheel", () => showWheel(showMenu));
   on("bShop", () => showDiamondShop(showMenu));
-  on("bStory", () => { useSlot("story", "story"); storyMigrate(); if (save.shifts > 0 || save.level > 1) beginGame(1); else { save.rel = "single"; save.life = newLife("single"); writeSave(); openCas(1); } });
+  on("bStory", () => { useSlot("story", "story"); storyMigrate(); if (storyStarted()) beginGame(1); else { save.rel = "single"; save.life = newLife("single"); writeSave(); openCas(1); } });
   on("bStoryCas", () => { useSlot("story", "story"); storyMigrate(); openCas(1); });
   on("bDuo", showDuoList);
   on("bNetGo", () => beginGame(2));
@@ -14003,7 +14011,7 @@ const NET = (() => {
 })();
 
 /* ---------- Online menüsü ---------- */
-const NET_BUILD = 55;   // online sürüm uyumu kontrolü
+const NET_BUILD = 56;   // online sürüm uyumu kontrolü
 /* oda kodu: Türkçe klavyede gelen İ/ı/Ö/Ü/Ş/Ç/Ğ harfleri düzeltilir, boşluklar atılır */
 const normCode = v => String(v || "").replace(/[İıi]/g, "I").replace(/[Öö0]/g, "O").replace(/[Üü]/g, "U").replace(/[Şş]/g, "S").replace(/[Çç]/g, "C").replace(/[Ğğ]/g, "G").toUpperCase().replace(/[^A-Z]/g, "").slice(0, 4);   // online sürüm uyumu kontrolü
 function showNetMenu(){
