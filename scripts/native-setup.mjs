@@ -45,8 +45,13 @@ function writeNativeConfig(platform){
     admob: { testing: !!A.testModu, android: { rewarded: adAndroid ? ad("androidOdulluReklam") : "" }, ios: { rewarded: adIos ? ad("iosOdulluReklam") : "" } },
     auth: { google: G.google !== false && (platform === "ios" ? fbIos : fbAndroid), apple: G.apple !== false && platform === "ios" && fbIos }
   };
+  // Firebase web anahtarı koda yazılmaz: GitHub gizli değişkeninden (FIREBASE_API_KEY) derleme anında eklenir
+  const fk = (process.env.FIREBASE_API_KEY || "").trim();
+  if (fk){ if (!/^AIza[0-9A-Za-z_-]{35}$/.test(fk)) fail("FIREBASE_API_KEY biçimi hatalı (AIza… ile başlayan 39 karakter olmalı)"); cfg.firebaseApiKey = fk; }
   wr("docs/native-config.js", `/* otomatik üretildi: scripts/native-setup.mjs (${platform}) */\nwindow.CBL_NATIVE_CFG = ${JSON.stringify(cfg, null, 2)};\n`);
-  say("native-config.js yazıldı:", JSON.stringify(cfg));
+  say("native-config.js yazıldı:", JSON.stringify(Object.assign({}, cfg, { firebaseApiKey: fk ? "*** (gizli değişkenden)" : "yok: bulut/online kapalı" })));
+  const html = rd("docs/index.html");
+  if (!fk && /__FIREBASE_API_KEY__/.test(html)) say("⚠️ FIREBASE_API_KEY gizli değişkeni yok: uygulamada Google girişi ve online oyun kapalı olacak (oyun misafir modda çalışır)");
 }
 
 function deps(){

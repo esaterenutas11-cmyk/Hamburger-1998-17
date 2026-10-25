@@ -100,3 +100,15 @@ Gizli değişkenler girilmeden iOS işi sadece "hatasız derleniyor mu" kontrol�
 
 Actions'taki kırmızı işin sayfasındaki hata satırlarını kopyalayıp Claude'a yapıştır.
 Sürüm yükseltmek için sadece `uygulama-ayarlari.json` › `surum`'u değiştir (ör. `1.0.1`).
+
+
+## Güvenlik: anahtarlar
+
+- **İmza anahtarı, şifreler, App Store anahtarı:** hiçbir zaman koda/zip'e girmez; sadece GitHub › Settings › Secrets'ta durur.
+- **Firebase web anahtarı (`AIza…`):** mağaza paketinde (zip) yoktur. Uygulama derlenirken GitHub gizli değişkeni **`FIREBASE_API_KEY`**'den eklenir
+  (değer: Firebase › Proje ayarları › Genel › Web API anahtarı). Gizli değişken yoksa uygulama misafir modda çalışır; Google girişi ve online oyun kapalı olur.
+- Bu anahtar Google'ın tasarımı gereği "gizli" değildir: tarayıcıda ya da uygulamada çalışan her Firebase oyununda cihaza iner. Asıl koruma
+  **anahtarı kısıtlamak**tır: https://console.cloud.google.com/apis/credentials › "Browser key (auto created by Firebase)" ›
+  - Uygulama kısıtlamaları › Web siteleri: `https://esaterenutas11-cmyk.github.io/*`, `capacitor://localhost/*`, `https://localhost/*`
+  - API kısıtlamaları › sadece: Identity Toolkit API, Token Service API, Cloud Firestore API, Firebase Realtime Database API, Firebase Installations API
+- Firestore kuralları zaten herkesin sadece kendi kaydını okuyup yazmasına izin verir (bölüm 6).
